@@ -27,7 +27,7 @@
 
 (defparameter *title* "Top View Action.")
 
-(defvar *scene* 'test)
+(defvar *scene* 'hello-tovia)
 
 (defun boxel () (* *box-size* *pixel-size*))
 
@@ -233,7 +233,7 @@
       (funcall fun win))))
 
 ;;;; TRANSITIONS
-;; TEST
+;; HELLO-TOVIA
 
 (defun hello-tovia (win)
   (uiop:nest
