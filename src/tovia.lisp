@@ -18,11 +18,7 @@
 
 (defparameter *title* "Top View Action.")
 
-(defvar *scene*
-  (lambda (win)
-    (error
-      "No scene bound for window ~S. ~:@_Do (setf tovia:*scene* your-func) or eval (tovia:main your-func)."
-      win)))
+(defvar *scene* 'test)
 
 (defun boxel () (* *box-size* *pixel-size*))
 
@@ -42,8 +38,7 @@
 
 ;;;; MAIN
 
-(defun main (&optional (scene #'hello-tovia))
-  (setq *scene* scene)
+(defun main (&optional (scene *scene*))
   (uiop:nest
     (sdl2:with-init (:everything))
     (sdl2:with-window (win :flags '(:shown :opengl)
@@ -55,7 +50,7 @@
       (gl:blend-func :src-alpha :one-minus-src-alpha))
     (fude-gl:with-shader ())
     (fude-gl:with-textures ())
-    (sequence-handler-bind (fun *scene*)
+    (sequence-handler-bind (fun scene)
       (funcall fun win))))
 
 ;;;; TRANSITIONS
