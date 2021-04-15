@@ -2,7 +2,7 @@
 
 (defpackage :tovia
   (:use :cl)
-  (:export))
+  (:export #:*title* #:*scene* #:main #:*width* #:*height* #:boxel))
 
 (in-package :tovia)
 
