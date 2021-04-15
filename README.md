@@ -1,11 +1,6 @@
-# TOVIA 0.0.0
+# TOVIA 0.2.0
 ## What is this?
-
-### Current lisp world
-
-### Issues
-
-### Proposal
+2D Top View Action game framework.
 
 ## Usage
 
@@ -14,6 +9,7 @@
 ### Product's goal
 
 ### License
+TODO
 
 ### Developed with
 

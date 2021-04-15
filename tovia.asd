@@ -1,8 +1,9 @@
 ; vim: ft=lisp et
 (in-package :asdf)
 (defsystem "tovia"
+  :description "2D Top View Action game framework."
   :version
-  "0.2.0"
+  "0.2.1"
   :depends-on
   (
    "cl-opengl" ; opengl bindings.
