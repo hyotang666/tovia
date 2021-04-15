@@ -2,9 +2,14 @@
 (in-package :asdf)
 (defsystem "tovia"
   :version
-  "0.0.0"
+  "0.1.0"
   :depends-on
-  nil
+  (
+   "cl-opengl" ; opengl bindings.
+   "fude-gl" ; opengl framework.
+   "sdl2" ; windowing.
+   "uiop" ; utilities.
+   )
   :pathname
   "src/"
   :components
