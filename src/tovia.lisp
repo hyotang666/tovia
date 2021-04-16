@@ -11,8 +11,21 @@
            #:defsprite
            #:sprite
            #:4-directional
+           #:effect
+           #:player
+           #:x
+           #:y
+           #:front
+           #:move
            #:list-all-sprites
-           #:move))
+           #:with-effects
+           #:*effects*
+           #:tracker
+           #:key-down-p
+           #:key-tracker-time
+           #:update-keystate
+           #:current
+           #:keypress-case))
 
 (in-package :tovia)
 
@@ -32,6 +45,48 @@
 
 (defun boxel () (* *box-size* *pixel-size*))
 
+;;;; PARAMETER
+
+(defun n-bits-max (n)
+  (values (read-from-string (format nil "#B~V,,,'1A" n #\1))))
+
+(defstruct (parameter (:constructor parameter)
+                      (:constructor make-parameter
+                       (num &aux (max num) (current num))))
+  (system-max (n-bits-max 8) :type (integer 0 *) :read-only t)
+  (max 100 :type integer)
+  (current 100 :type integer))
+
+(declaim (ftype function current max-of))
+
+(setf (symbol-function 'current) #'parameter-current
+      (symbol-function 'max-of) #'parameter-max)
+
+(defun (setf current) (new parameter)
+  (setf (parameter-current parameter) (min (parameter-max parameter) new)))
+
+(defun (setf max-of) (new parameter)
+  (setf (parameter-max parameter) (min (parameter-system-max parameter) new)))
+
+;;;; KEY-TRACKER
+
+(defstruct key-tracker
+  (state (make-array 256 :element-type 'bit) :type bit-vector)
+  (time (parameter :max 30 :current 0) :type parameter :read-only t))
+
+(defun keystate (tracker character)
+  (aref (key-tracker-state tracker) (char-code character)))
+
+(defun update-keystate (tracker character state)
+  (setf (aref (key-tracker-state tracker) (char-code character))
+          (ecase state (:down 1) (:up 0))))
+
+(defun key-down-p (tracker character)
+  (= 1 (aref (key-tracker-state tracker) (char-code character))))
+
+(defmethod print-object ((o key-tracker) stream)
+  (print-unreadable-object (o stream :type t)))
+
 ;; STEPPER
 
 (defclass stepper () (first step) (:metaclass c2mop:funcallable-standard-class))
@@ -47,10 +102,9 @@
 
 (defun make-stepper (spec) (make-instance 'stepper :spec spec))
 
-;; TIMER
+(defun last-step (stepper) (car (slot-value stepper 'step)))
 
-(defun n-bits-max (n)
-  (values (read-from-string (format nil "#B~V,,,'1A" n #\1))))
+;; TIMER
 
 (defclass timer ()
   ((time :initform (n-bits-max 7) :reader time<-timer)
@@ -82,9 +136,9 @@
     (defun main ()
       "coord = st;"
       "gl_Position = projection * model * vec4(xy, 0.0, 1.0);"))
-  (:fragment ((color :vec4) &uniform (tex :|sampler2D|))
+  (:fragment ((color :vec4) &uniform (tex :|sampler2D|) (alpha :float))
     (declaim (ftype (function nil (values)) main))
-    (defun main () "color = texture(tex, coord);")))
+    (defun main () "color = alpha * texture(tex, coord);")))
 
 ;; VERTICES
 
@@ -117,51 +171,91 @@
    (unit :initform 1 :initarg :unit :reader unit)
    (texture :initarg :texture :reader texture)
    (stepper :type function :reader stepper)
-   (timer :type function :initform (make-timer 10) :reader timer)))
+   (timer :type function :reader timer)))
 
 (defmethod initialize-instance :after
            ((o sprite)
             &key (projection (alexandria:required-argument :projection))
             (win (alexandria:required-argument :win))
-            (stepper (alexandria:circular-list 0 1 2 1)))
+            (stepper (alexandria:circular-list 0 1 2 1)) (timer 10))
   (setf (slot-value o 'projection) (funcall projection win)
-        (slot-value o 'stepper) (make-stepper stepper)))
+        (slot-value o 'stepper) (make-stepper stepper)
+        (slot-value o 'timer) (make-timer timer)))
 
 (defclass directional ()
   ((last-direction :initform :s :type direction :accessor last-direction)))
 
 (defclass 4-directional (sprite directional) ())
 
+(defclass player (4-directional)
+  ((key-tracker :initform (make-key-tracker)
+                :type key-tracker
+                :reader tracker)))
+
+(defclass effect (sprite) ((life :initform 1 :accessor life)))
+
 ;;;; DRAW
 
 (defun updatep (sprite) (not (zerop (funcall (timer sprite)))))
 
+(defmacro asignf (vertices &rest args)
+  `(setf ,@(loop :for index :in '(2 3 6 7 10 11 14 15)
+                 :for v :in args
+                 :collect `(gl:glaref ,vertices ,index)
+                 :collect v)))
+
 (defmethod fude-gl:draw :before ((o 4-directional))
-  (when (updatep o)
-    (let* ((unit (unit o))
-           (step (funcall (stepper o)))
-           (left (float (* unit step)))
-           (right (+ left unit))
-           (bottom
-            (float
-              (ecase (last-direction o)
-                ((:n :nw :ne) 0)
-                ((:s :sw :se) (* 3 unit))
-                ((:w) (* 2 unit))
-                ((:e) unit))))
-           (top (+ bottom unit))
-           (vertices
-            (fude-gl:buffer-source
-              (fude-gl:buffer (fude-gl:find-vertices 'sprite-quad)))))
-      #.(flet ((asign (args) ; as macrolet but easy to debug (i.e. expand).
-                 `(setf ,@(loop :for index :in '(2 3 6 7 10 11 14 15)
-                                :for value :in args
-                                :collect `(gl:glaref vertices ,index)
-                                :collect value))))
-          (asign '(left top left bottom right top right bottom)))
-      (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))))
+  (let* ((unit (unit o))
+         (step
+          (if (updatep o)
+              (funcall (stepper o))
+              (last-step (stepper o))))
+         (left (float (* unit step)))
+         (right (+ left unit))
+         (bottom
+          (float
+            (ecase (last-direction o)
+              ((:n :nw :ne) 0)
+              ((:s :sw :se) (* 3 unit))
+              ((:w) (* 2 unit))
+              ((:e) unit))))
+         (top (+ bottom unit))
+         (vertices
+          (fude-gl:buffer-source
+            (fude-gl:buffer (fude-gl:find-vertices 'sprite-quad)))))
+    (asignf vertices left top left bottom right top right bottom))
+  (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
 
 (defmethod fude-gl:draw ((o 4-directional))
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0)
+  (call-next-method))
+
+(defmethod fude-gl:draw :before ((o effect))
+  (let ((step
+         (if (updatep o)
+             (funcall (stepper o))
+             (last-step (stepper o)))))
+    (if (null step)
+        (return-from fude-gl:draw (decf (life o)))
+        (destructuring-bind
+            (x y)
+            step
+          (let* ((unit (unit o))
+                 (left (float (* unit x)))
+                 (right (+ left unit))
+                 (bottom (float (* unit y)))
+                 (top (+ bottom unit))
+                 (vertices
+                  (fude-gl:buffer-source
+                    (fude-gl:buffer (fude-gl:find-vertices 'sprite-quad)))))
+            (asignf vertices left top left bottom right top right bottom))
+          (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data)))))
+
+(defmethod fude-gl:draw ((o effect))
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875)
+  (call-next-method))
+
+(defmethod fude-gl:draw ((o sprite))
   (fude-gl:with-uniforms (projection model (tex :unit 0))
       (fude-gl:shader 'sprite-quad)
     (setf projection (projection o)
@@ -222,6 +316,31 @@
        (keypress-case
          (:up (go-up o win) (setf (last-direction o) :nw))
          (:down (go-down o) (setf (last-direction o) :sw)))))))
+
+(defparameter *effects* nil)
+
+(defmacro with-effects (() &body body)
+  `(progn
+    ,@body
+    (mapc #'fude-gl:draw *effects*)
+    (setf *effects* (delete-if #'zerop *effects* :key #'life))))
+
+(defun pprint-with-effects (stream exp)
+  (funcall (formatter "~:<~W~1I ~@_~:<~@{~W~^ ~@_~}~:>~^ ~_~@{~W~^ ~_~}~:>")
+           stream exp))
+
+(set-pprint-dispatch '(cons (member with-effects)) 'pprint-with-effects)
+
+(defun front (player)
+  (ecase (last-direction player)
+    (:n (values (x player) (+ (y player) (boxel))))
+    (:s (values (x player) (- (y player) (boxel))))
+    (:w (values (- (x player) (boxel)) (y player)))
+    (:e (values (+ (x player) (boxel)) (y player)))
+    (:nw (values (- (x player) (boxel)) (+ (y player) (boxel))))
+    (:ne (values (+ (x player) (boxel)) (+ (y player) (boxel))))
+    (:sw (values (- (x player) (boxel)) (- (y player) (boxel))))
+    (:se (values (+ (x player) (boxel)) (- (y player) (boxel))))))
 
 ;;;; DEFSPRITE
 
