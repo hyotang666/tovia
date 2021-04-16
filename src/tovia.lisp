@@ -11,7 +11,8 @@
            #:defsprite
            #:sprite
            #:4-directional
-           #:list-all-sprites))
+           #:list-all-sprites
+           #:move))
 
 (in-package :tovia)
 
@@ -103,9 +104,8 @@
 (deftype direction () '(member :n :s :e :w :nw :ne :sw :se))
 
 (defclass sprite ()
-  ((coord :initform (3d-vectors:vec3 0 0 0)
-          :type 3d-vectors:vec3
-          :reader coord)
+  ((x :initform 0 :initarg :x :accessor x)
+   (y :initform 0 :initarg :y :accessor y)
    (projection :initarg :projection
                :type 3d-matrices:mat4
                :reader projection
@@ -131,6 +131,8 @@
   ((last-direction :initform :s :type direction :accessor last-direction)))
 
 (defclass 4-directional (sprite directional) ())
+
+;;;; DRAW
 
 (defun updatep (sprite) (not (zerop (funcall (timer sprite)))))
 
@@ -160,12 +162,66 @@
       (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))))
 
 (defmethod fude-gl:draw ((o 4-directional))
-  (fude-gl:with-uniforms (projection view model (tex :unit 0))
+  (fude-gl:with-uniforms (projection model (tex :unit 0))
       (fude-gl:shader 'sprite-quad)
     (setf projection (projection o)
-          model (3d-matrices:nmtranslate (model o) (coord o))
+          model
+            (let* ((boxel (boxel)) (half (/ boxel 2)))
+              (fude-gl:model-matrix (+ half (x o)) (+ half (y o)) boxel boxel))
           tex (texture o))
     (fude-gl:draw 'sprite-quad)))
+
+;;;; MOVE
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun <keypress-pred> (key)
+    (etypecase key
+      ((cons (eql or)) `(or ,@(mapcar #'<keypress-pred> (cdr key))))
+      ((cons (eql and)) `(and ,@(mapcar #'<keypress-pred> (cdr key))))
+      (atom
+       `(sdl2:keyboard-state-p
+          ,(sdl2:scancode-key-to-value
+             (intern (format nil "SCANCODE-~A" key) :keyword)))))))
+
+(defmacro keypress-case (&body clause+)
+  `(cond
+     ,@(mapcar
+         (lambda (clause)
+           (if (eq 'otherwise (car clause))
+               `(t ,@(cdr clause))
+               `(,(<keypress-pred> (car clause)) ,@(cdr clause))))
+         clause+)))
+
+(flet ((go-down (o)
+         (setf (y o) (max 0 (- (y o) *pixel-size*))))
+       (go-up (o win)
+         (setf (y o)
+                 (min (- (nth-value 1 (sdl2:get-window-size win)) (boxel))
+                      (+ (y o) *pixel-size*))))
+       (go-left (o)
+         (setf (x o) (max 0 (- (x o) *pixel-size*))))
+       (go-right (o win)
+         (setf (x o)
+                 (min (- (sdl2:get-window-size win) (boxel))
+                      (+ (x o) *pixel-size*)))))
+  (defun move (o win)
+    (keypress-case
+      (:down (go-down o) (setf (last-direction o) :s)
+       (keypress-case
+         (:left (go-left o) (setf (last-direction o) :sw))
+         (:right (go-right o win) (setf (last-direction o) :se))))
+      (:up (go-up o win) (setf (last-direction o) :n)
+       (keypress-case
+         (:left (go-left o) (setf (last-direction o) :nw))
+         (:right (go-right o win) (setf (last-direction o) :ne))))
+      (:right (go-right o win) (setf (last-direction o) :e)
+       (keypress-case
+         (:up (go-up o win) (setf (last-direction o) :ne))
+         (:down (go-down o) (setf (last-direction o) :se))))
+      (:left (go-left o) (setf (last-direction o) :w)
+       (keypress-case
+         (:up (go-up o win) (setf (last-direction o) :nw))
+         (:down (go-down o) (setf (last-direction o) :sw)))))))
 
 ;;;; DEFSPRITE
 
