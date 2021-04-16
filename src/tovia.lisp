@@ -348,15 +348,17 @@
 
 (defun list-all-sprites () (alexandria:hash-table-keys *sprites*))
 
-(defun sprite (name win)
-  (or (funcall (gethash name *sprites* (constantly nil)) win)
+(defun sprite (name win &rest args)
+  (or (funcall (gethash name *sprites* (constantly nil)) win args)
       (error "Missing sprite ~S. Eval (list-all-sprites)." name)))
 
 (defmacro defsprite (name type &body args)
-  (let ((win (gensym "WINDOW")))
+  (let ((win (gensym "WINDOW")) (vargs (gensym "ARGS")))
     `(progn
       (setf (gethash ',name *sprites*)
-              (lambda (,win) (make-instance ',type :win ,win ,@args)))
+              (lambda (,win ,vargs)
+                (apply #'make-instance ',type :win ,win
+                       (append ,vargs (list ,@args)))))
       'name)))
 
 (defun pprint-defsprite (stream exp)
