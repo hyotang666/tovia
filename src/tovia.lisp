@@ -9,12 +9,14 @@
            #:*height*
            #:*colliders*
            #:collidep
+           #:react
            #:boxel
            #:*pixel-size*
            #:defsprite
            #:sprite
            #:4-directional
            #:effect
+           #:who
            #:player
            #:life
            #:x
@@ -204,7 +206,8 @@
                 :reader tracker)))
 
 (defclass effect (sprite)
-  ((life :initform (parameter) :reader life :type parameter)))
+  ((life :initform (parameter) :reader life :type parameter)
+   (who :initarg :who :reader who :type being)))
 
 ;;;; DRAW
 
@@ -351,7 +354,7 @@
 
 (defun delete-lives ()
   (quaspar:do-lqtree (o *colliders*)
-    (when (and (typep o 'effect) (zerop (current (life o))))
+    (when  (<= (current (life o)) 0)
       (del o))))
 
 (defun collidep (a b)
@@ -371,6 +374,17 @@
           (vertices b)
         (and (or (< b-left a-left b-right) (< b-left a-right b-right))
              (or (< b-top a-top b-bottom) (< b-top a-bottom b-bottom)))))))
+
+(defgeneric react (subject object) (:method (s o))) ; Do nothing.
+
+(defgeneric damage (subject object) (:method (s o) 100))
+
+(defmethod react ((subject effect) (object 4-directional))
+  (unless (eq (who subject) object)
+    (print (decf (current (life object)) (damage subject object)))))
+
+(defmethod react ((subject 4-directional) (object effect))
+  (react object subject))
 
 (defun front (player)
   (ecase (last-direction player)
