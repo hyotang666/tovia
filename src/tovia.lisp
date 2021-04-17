@@ -16,6 +16,7 @@
            #:4-directional
            #:effect
            #:player
+           #:life
            #:x
            #:y
            #:front
