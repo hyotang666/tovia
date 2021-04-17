@@ -7,7 +7,10 @@
            #:main
            #:*width*
            #:*height*
+           #:*colliders*
+           #:collidep
            #:boxel
+           #:*pixel-size*
            #:defsprite
            #:sprite
            #:4-directional
@@ -18,8 +21,8 @@
            #:front
            #:move
            #:list-all-sprites
-           #:with-effects
-           #:*effects*
+           #:add
+           #:delete-lives
            #:tracker
            #:key-down-p
            #:key-tracker-time
@@ -44,6 +47,8 @@
 (defvar *scene* 'hello-tovia)
 
 (defun boxel () (* *box-size* *pixel-size*))
+
+(defvar *colliders*)
 
 ;;;; PARAMETER
 
@@ -157,10 +162,8 @@
 
 (deftype direction () '(member :n :s :e :w :nw :ne :sw :se))
 
-(defclass sprite ()
-  ((x :initform 0 :initarg :x :accessor x)
-   (y :initform 0 :initarg :y :accessor y)
-   (projection :initarg :projection
+(defclass sprite (quaspar:lqtree-storable)
+  ((projection :initarg :projection
                :type 3d-matrices:mat4
                :reader projection
                :allocation :class)
@@ -171,7 +174,8 @@
    (unit :initform 1 :initarg :unit :reader unit)
    (texture :initarg :texture :reader texture)
    (stepper :type function :reader stepper)
-   (timer :type function :reader timer)))
+   (timer :type function :reader timer))
+  (:default-initargs :x 0 :y 0 :w (boxel) :h (boxel)))
 
 (defmethod initialize-instance :after
            ((o sprite)
@@ -182,17 +186,24 @@
         (slot-value o 'stepper) (make-stepper stepper)
         (slot-value o 'timer) (make-timer timer)))
 
+(defmethod quaspar:x ((o sprite)) (quaspar:x (quaspar:rect o)))
+
+(defmethod quaspar:y ((o sprite)) (quaspar:y (quaspar:rect o)))
+
 (defclass directional ()
   ((last-direction :initform :s :type direction :accessor last-direction)))
 
-(defclass 4-directional (sprite directional) ())
+(defclass being () ((life :initform (parameter) :reader life :type parameter)))
+
+(defclass 4-directional (sprite directional being) ())
 
 (defclass player (4-directional)
   ((key-tracker :initform (make-key-tracker)
                 :type key-tracker
                 :reader tracker)))
 
-(defclass effect (sprite) ((life :initform 1 :accessor life)))
+(defclass effect (sprite)
+  ((life :initform (parameter) :reader life :type parameter)))
 
 ;;;; DRAW
 
@@ -236,7 +247,7 @@
              (funcall (stepper o))
              (last-step (stepper o)))))
     (if (null step)
-        (return-from fude-gl:draw (decf (life o)))
+        (return-from fude-gl:draw (setf (current (life o)) 0))
         (destructuring-bind
             (x y)
             step
@@ -261,7 +272,8 @@
     (setf projection (projection o)
           model
             (let* ((boxel (boxel)) (half (/ boxel 2)))
-              (fude-gl:model-matrix (+ half (x o)) (+ half (y o)) boxel boxel))
+              (fude-gl:model-matrix (+ half (quaspar:x o))
+                                    (+ half (quaspar:y o)) boxel boxel))
           tex (texture o))
     (fude-gl:draw 'sprite-quad)))
 
@@ -287,17 +299,22 @@
          clause+)))
 
 (flet ((go-down (o)
-         (setf (y o) (max 0 (- (y o) *pixel-size*))))
+         (quaspar:move o (quaspar:x o) (max 0 (- (quaspar:y o) *pixel-size*))
+                       *colliders*))
        (go-up (o win)
-         (setf (y o)
-                 (min (- (nth-value 1 (sdl2:get-window-size win)) (boxel))
-                      (+ (y o) *pixel-size*))))
+         (quaspar:move o (quaspar:x o)
+                       (min
+                         (- (nth-value 1 (sdl2:get-window-size win)) (boxel))
+                         (+ (quaspar:y o) *pixel-size*))
+                       *colliders*))
        (go-left (o)
-         (setf (x o) (max 0 (- (x o) *pixel-size*))))
+         (quaspar:move o (max 0 (- (quaspar:x o) *pixel-size*)) (quaspar:y o)
+                       *colliders*))
        (go-right (o win)
-         (setf (x o)
-                 (min (- (sdl2:get-window-size win) (boxel))
-                      (+ (x o) *pixel-size*)))))
+         (quaspar:move o
+                       (min (- (sdl2:get-window-size win) (boxel))
+                            (+ (quaspar:x o) *pixel-size*))
+                       (quaspar:y o) *colliders*)))
   (defun move (o win)
     (keypress-case
       (:down (go-down o) (setf (last-direction o) :s)
@@ -317,30 +334,57 @@
          (:up (go-up o win) (setf (last-direction o) :nw))
          (:down (go-down o) (setf (last-direction o) :sw)))))))
 
-(defparameter *effects* nil)
+;;;; COLLIDERS
 
-(defmacro with-effects (() &body body)
-  `(progn
-    ,@body
-    (mapc #'fude-gl:draw *effects*)
-    (setf *effects* (delete-if #'zerop *effects* :key #'life))))
+(defmacro with-colliders
+          ((&key (win (alexandria:required-argument :win))) &body body)
+  `(let ((*colliders*
+          (multiple-value-call #'quaspar:make-lqtree
+            (sdl2:get-window-size ,win)
+            4)))
+     ,@body))
 
-(defun pprint-with-effects (stream exp)
-  (funcall (formatter "~:<~W~1I ~@_~:<~@{~W~^ ~@_~}~:>~^ ~_~@{~W~^ ~_~}~:>")
-           stream exp))
+(defun add (storable) (quaspar:add storable *colliders*))
 
-(set-pprint-dispatch '(cons (member with-effects)) 'pprint-with-effects)
+(defun del (storable) (quaspar:delete storable *colliders*))
+
+(defun delete-lives ()
+  (quaspar:do-lqtree (o *colliders*)
+    (when (and (typep o 'effect) (zerop (current (life o))))
+      (del o))))
+
+(defun collidep (a b)
+  (flet ((vertices (o)
+           (let* ((half-w (/ (quaspar:w (quaspar:rect o)) 2))
+                  (half-h (/ (quaspar:h (quaspar:rect o)) 2))
+                  (x (quaspar:x (quaspar:rect o)))
+                  (y (quaspar:y (quaspar:rect o)))
+                  (left (- x half-w))
+                  (right (+ x half-w))
+                  (top (- y half-h))
+                  (bottom (+ y half-h)))
+             (values left right top bottom))))
+    (multiple-value-bind (a-left a-right a-top a-bottom)
+        (vertices a)
+      (multiple-value-bind (b-left b-right b-top b-bottom)
+          (vertices b)
+        (and (or (< b-left a-left b-right) (< b-left a-right b-right))
+             (or (< b-top a-top b-bottom) (< b-top a-bottom b-bottom)))))))
 
 (defun front (player)
   (ecase (last-direction player)
-    (:n (values (x player) (+ (y player) (boxel))))
-    (:s (values (x player) (- (y player) (boxel))))
-    (:w (values (- (x player) (boxel)) (y player)))
-    (:e (values (+ (x player) (boxel)) (y player)))
-    (:nw (values (- (x player) (boxel)) (+ (y player) (boxel))))
-    (:ne (values (+ (x player) (boxel)) (+ (y player) (boxel))))
-    (:sw (values (- (x player) (boxel)) (- (y player) (boxel))))
-    (:se (values (+ (x player) (boxel)) (- (y player) (boxel))))))
+    (:n (values (quaspar:x player) (+ (quaspar:y player) (boxel))))
+    (:s (values (quaspar:x player) (- (quaspar:y player) (boxel))))
+    (:w (values (- (quaspar:x player) (boxel)) (quaspar:y player)))
+    (:e (values (+ (quaspar:x player) (boxel)) (quaspar:y player)))
+    (:nw
+     (values (- (quaspar:x player) (boxel)) (+ (quaspar:y player) (boxel))))
+    (:ne
+     (values (+ (quaspar:x player) (boxel)) (+ (quaspar:y player) (boxel))))
+    (:sw
+     (values (- (quaspar:x player) (boxel)) (- (quaspar:y player) (boxel))))
+    (:se
+     (values (+ (quaspar:x player) (boxel)) (- (quaspar:y player) (boxel))))))
 
 ;;;; DEFSPRITE
 
@@ -404,6 +448,7 @@
     (sdl2:with-gl-context (context win)
       (gl:enable :blend)
       (gl:blend-func :src-alpha :one-minus-src-alpha))
+    (with-colliders (:win win))
     (fude-gl:with-shader ())
     (fude-gl:with-textures ())
     (sequence-handler-bind (fun scene)

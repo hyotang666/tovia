@@ -3,7 +3,7 @@
 (defsystem "tovia"
   :description "2D Top View Action game framework."
   :version
-  "0.7.0"
+  "0.8.0"
   :depends-on
   (
    "cl-opengl" ; opengl bindings.
@@ -14,6 +14,7 @@
    "closer-mop" ; Wrapper for Metaobject Protocol.
    "3d-vectors" ; Vector operations.
    "3d-matrices" ; Matrix operations.
+   "quaspar" ; collision detection.
    )
   :pathname
   "src/"
