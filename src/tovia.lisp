@@ -15,6 +15,7 @@
            #:defsprite
            #:sprite
            #:4-directional
+           #:response?
            #:effect
            #:who
            #:player
@@ -23,6 +24,7 @@
            #:y
            #:front
            #:move
+           #:target-direction
            #:list-all-sprites
            #:add
            #:delete-lives
@@ -196,7 +198,15 @@
 (defclass directional ()
   ((last-direction :initform :s :type direction :accessor last-direction)))
 
-(defclass being () ((life :initform (parameter) :reader life :type parameter)))
+(defclass being ()
+  ((life :initform (parameter) :reader life :type parameter)
+   (response :initarg :response :reader response :type timer)))
+
+(defmethod initialize-instance :after
+           ((o being) &key (response (n-bits-max 7)))
+  (setf (slot-value o 'response) (make-timer response)))
+
+(defun response? (being) (< 0 (funcall (response being))))
 
 (defclass 4-directional (sprite directional being) ())
 
@@ -319,24 +329,48 @@
                        (min (- (sdl2:get-window-size win) (boxel))
                             (+ (quaspar:x o) *pixel-size*))
                        (quaspar:y o) *colliders*)))
-  (defun move (o win)
-    (keypress-case
-      (:down (go-down o) (setf (last-direction o) :s)
-       (keypress-case
-         (:left (go-left o) (setf (last-direction o) :sw))
-         (:right (go-right o win) (setf (last-direction o) :se))))
-      (:up (go-up o win) (setf (last-direction o) :n)
-       (keypress-case
-         (:left (go-left o) (setf (last-direction o) :nw))
-         (:right (go-right o win) (setf (last-direction o) :ne))))
-      (:right (go-right o win) (setf (last-direction o) :e)
-       (keypress-case
-         (:up (go-up o win) (setf (last-direction o) :ne))
-         (:down (go-down o) (setf (last-direction o) :se))))
-      (:left (go-left o) (setf (last-direction o) :w)
-       (keypress-case
-         (:up (go-up o win) (setf (last-direction o) :nw))
-         (:down (go-down o) (setf (last-direction o) :sw)))))))
+  (defgeneric move (subject window &key)
+    (:method (o (win sdl2-ffi:sdl-window) &key direction)
+      (ecase direction
+        (:n (go-up o win))
+        (:s (go-down o))
+        (:e (go-right o win))
+        (:w (go-left o))
+        (:nw (go-up o win) (go-left o))
+        (:ne (go-up o win) (go-right o win))
+        (:sw (go-down o) (go-left o))
+        (:se (go-down o) (go-right o win)))
+      (setf (last-direction o) direction))
+    (:method ((o player) (win sdl2-ffi:sdl-window) &key)
+      (let ((direction
+             (keypress-case
+               (:down
+                (keypress-case
+                  (:left :sw)
+                  (:right :se)
+                  (otherwise :s)))
+               (:up
+                (keypress-case
+                  (:left :nw)
+                  (:right :ne)
+                  (otherwise :n)))
+               (:right
+                (keypress-case
+                  (:up :ne)
+                  (:down :se)
+                  (otherwise :e)))
+               (:left
+                (keypress-case
+                  (:up :nw)
+                  (:down :sw)
+                  (otherwise :w))))))
+        (when direction
+          (call-next-method o win :direction direction))))
+    (:method ((o being) (win sdl2-ffi:sdl-window) &key direction)
+      (call-next-method o win
+                        :direction (or direction
+                                       (aref #(:n :w :w :e :nw :ne :sw :se)
+                                             (random 8)))))))
 
 ;;;; COLLIDERS
 
@@ -374,6 +408,57 @@
           (vertices b)
         (and (or (< b-left a-left b-right) (< b-left a-right b-right))
              (or (< b-top a-top b-bottom) (< b-top a-bottom b-bottom)))))))
+
+(defun in-sight-p (a b distance)
+  (<
+    (sqrt
+      (+ (expt (- (quaspar:x a) (quaspar:x b)) 2)
+         (expt (- (quaspar:y a) (quaspar:y b)) 2)))
+    distance))
+
+(defun compass (lat1 lon1 lat2 lon2)
+  (labels ((radian (degree)
+             (* degree #.(/ pi 180)))
+           (bearing (radians)
+             (rem (+ 360 (degrees radians)) 360))
+           (degrees (radians)
+             (/ (* radians 180) pi)))
+    (let ((d-lon (radian (- lon2 lon1)))
+          (d-phi
+           (log
+             (/ (tan (+ (/ (radian lat2) 2) #.(/ pi 4)))
+                (tan (+ (/ (radian lat1) 2) #.(/ pi 4)))))))
+      (when (< pi (abs d-lon))
+        (setq d-lon
+                (if (< 0 d-lon)
+                    (- (- #.(* 2 pi) d-lon))
+                    (+ #.(* 2 pi) d-lon))))
+      (bearing (atan d-lon (realpart d-phi))))))
+
+(defun target-direction (subject object)
+  (let ((bearing
+         (let ((w (* *width* (boxel))) (h (* *height* (boxel))))
+           ;; Normarize coordinates otherwise unexpected behavior
+           ;; especially with 360.
+           (compass (/ (quaspar:x subject) w) (/ (quaspar:y subject) h)
+                    (/ (quaspar:x object) w) (/ (quaspar:y object) h)))))
+    (if (<= bearing 22.5)
+        :e
+        (if (<= bearing 67.5)
+            :ne
+            (if (<= bearing 112.5)
+                :n
+                (if (<= bearing 157.5)
+                    :nw
+                    (if (<= bearing 202.5)
+                        :w
+                        (if (<= bearing 247.5)
+                            :sw
+                            (if (<= bearing 292.5)
+                                :s
+                                (if (<= bearing 337.5)
+                                    :se
+                                    :e))))))))))
 
 (defgeneric react (subject object) (:method (s o))) ; Do nothing.
 
