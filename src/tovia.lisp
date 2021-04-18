@@ -557,6 +557,7 @@
     (fude-gl:with-shader ())
     (fude-gl:with-textures ())
     (sequence-handler-bind (fun scene)
+      (quaspar:clear-lqtree *colliders*)
       (funcall fun win))))
 
 ;;;; TRANSITIONS
