@@ -17,6 +17,8 @@
            #:4-directional
            #:response?
            #:effect
+           #:damager
+           #:knock-backer
            #:who
            #:player
            #:being
@@ -220,7 +222,14 @@
 
 (defclass effect (sprite)
   ((life :initform (parameter) :reader life :type parameter)
+   (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
+
+(defmethod initialize-instance :after
+           ((o effect) &key effects (win (alexandria:required-argument :win)))
+  (setf (slot-value o 'effects)
+          (loop :for constructor :in effects
+                :collect (funcall constructor win))))
 
 ;;;; DRAW
 
@@ -333,7 +342,7 @@
                             (+ (quaspar:x o) *pixel-size*))
                        (quaspar:y o) *colliders*)))
   (defgeneric move (subject window &key)
-    (:method (o (win sdl2-ffi:sdl-window) &key direction)
+    (:method (o (win sdl2-ffi:sdl-window) &key direction animate)
       (ecase direction
         (:n (go-up o win))
         (:s (go-down o))
@@ -343,37 +352,40 @@
         (:ne (go-up o win) (go-right o win))
         (:sw (go-down o) (go-left o))
         (:se (go-down o) (go-right o win)))
-      (setf (last-direction o) direction))
-    (:method ((o player) (win sdl2-ffi:sdl-window) &key)
+      (when animate
+        (setf (last-direction o) direction)))
+    (:method ((o player) (win sdl2-ffi:sdl-window) &key (animate t) direction)
       (let ((direction
-             (keypress-case
-               (:down
-                (keypress-case
-                  (:left :sw)
-                  (:right :se)
-                  (otherwise :s)))
-               (:up
-                (keypress-case
-                  (:left :nw)
-                  (:right :ne)
-                  (otherwise :n)))
-               (:right
-                (keypress-case
-                  (:up :ne)
-                  (:down :se)
-                  (otherwise :e)))
-               (:left
-                (keypress-case
-                  (:up :nw)
-                  (:down :sw)
-                  (otherwise :w))))))
+             (or direction
+                 (keypress-case
+                   (:down
+                    (keypress-case
+                      (:left :sw)
+                      (:right :se)
+                      (otherwise :s)))
+                   (:up
+                    (keypress-case
+                      (:left :nw)
+                      (:right :ne)
+                      (otherwise :n)))
+                   (:right
+                    (keypress-case
+                      (:up :ne)
+                      (:down :se)
+                      (otherwise :e)))
+                   (:left
+                    (keypress-case
+                      (:up :nw)
+                      (:down :sw)
+                      (otherwise :w)))))))
         (when direction
-          (call-next-method o win :direction direction))))
-    (:method ((o being) (win sdl2-ffi:sdl-window) &key direction)
+          (call-next-method o win :direction direction :animate animate))))
+    (:method ((o being) (win sdl2-ffi:sdl-window) &key direction (animate t))
       (call-next-method o win
                         :direction (or direction
                                        (aref #(:n :w :w :e :nw :ne :sw :se)
-                                             (random 8)))))))
+                                             (random 8)))
+                        :animate animate))))
 
 ;;;; COLLIDERS
 
@@ -467,11 +479,38 @@
 
 (defgeneric react (subject object) (:method (s o))) ; Do nothing.
 
-(defgeneric damage (subject object) (:method (s o) 100))
-
 (defmethod react ((subject effect) (object 4-directional))
   (unless (eq (who subject) object)
-    (decf (current (life object)) (damage subject object))))
+    (dolist (effect (effects subject)) (funcall effect subject object))))
+
+(defun damager (damage)
+  (constantly
+    (lambda (subject object)
+      (declare (ignore subject))
+      (decf (current (life object)) damage))))
+
+(defun knock-backer (powor)
+  (lambda (win)
+    (lambda (subject object)
+      (declare (ignore subject))
+      (let ((*pixel-size* powor))
+        (move object win
+              :direction (turn-direction (last-direction object))
+              :animate nil)))))
+
+(let ((turns (make-hash-table :test #'eq)))
+  (flet ((def (a b)
+           (setf (gethash a turns) b)))
+    (def :n :s)
+    (def :ne :sw)
+    (def :e :w)
+    (def :se :nw)
+    (def :s :n)
+    (def :sw :ne)
+    (def :w :e)
+    (def :nw :se))
+  (defun turn-direction (direction)
+    (or (gethash direction turns) (error "Unknown direction ~S." direction))))
 
 (defmethod react ((subject 4-directional) (object effect))
   (react object subject))
