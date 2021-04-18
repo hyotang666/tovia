@@ -20,6 +20,7 @@
            #:who
            #:player
            #:life
+           #:deadp
            #:x
            #:y
            #:front
@@ -386,9 +387,11 @@
 
 (defun del (storable) (quaspar:delete storable *colliders*))
 
+(defun deadp (o) (<= (current (life o)) 0))
+
 (defun delete-lives ()
   (quaspar:do-lqtree (o *colliders*)
-    (when (<= (current (life o)) 0)
+    (when (deadp o)
       (del o))))
 
 (defun collidep (a b)
