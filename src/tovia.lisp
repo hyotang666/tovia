@@ -354,7 +354,7 @@
 
 (defun delete-lives ()
   (quaspar:do-lqtree (o *colliders*)
-    (when  (<= (current (life o)) 0)
+    (when (<= (current (life o)) 0)
       (del o))))
 
 (defun collidep (a b)
