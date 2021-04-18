@@ -29,6 +29,7 @@
            #:list-all-sprites
            #:add
            #:delete-lives
+           #:sequence-transition
            #:tracker
            #:key-down-p
            #:key-tracker-time
