@@ -19,6 +19,7 @@
            #:effect
            #:who
            #:player
+           #:being
            #:life
            #:deadp
            #:x
