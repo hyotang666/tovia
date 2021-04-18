@@ -381,7 +381,7 @@
 
 (defmethod react ((subject effect) (object 4-directional))
   (unless (eq (who subject) object)
-    (print (decf (current (life object)) (damage subject object)))))
+    (decf (current (life object)) (damage subject object))))
 
 (defmethod react ((subject 4-directional) (object effect))
   (react object subject))
