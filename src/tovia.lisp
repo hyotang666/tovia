@@ -317,8 +317,8 @@
             (ecase (last-direction o)
               ((:n :ne) 0)
               ((:s :sw) (* 3 unit))
-              ((:w :nw) (* 2 unit))
-              ((:e :se) unit))))
+              ((:w :se) (* 2 unit))
+              ((:e :nw) unit))))
          (top (+ bottom unit))
          (vertices
           (fude-gl:buffer-source
