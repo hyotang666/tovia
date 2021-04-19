@@ -23,6 +23,7 @@
            #:knock-backer
            #:who
            #:player
+           #:move-coeff
            #:being
            #:life
            #:deadp
