@@ -16,7 +16,9 @@
            #:sprite
            #:npc
            #:response?
-           #:effect
+           #:melee
+           #:projectile
+           #:last-direction
            #:damager
            #:knock-backer
            #:who
@@ -214,7 +216,10 @@
 (defmethod quaspar:y ((o sprite)) (quaspar:y (quaspar:rect o)))
 
 (defclass directional ()
-  ((last-direction :initform :s :type direction :accessor last-direction)))
+  ((last-direction :initarg :direction
+                   :initform :s
+                   :type direction
+                   :accessor last-direction)))
 
 (defclass being ()
   ((life :initform (parameter) :reader life :type parameter)
@@ -227,6 +232,8 @@
 
 (defun coeff (init coeff)
   (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
+
+(defmethod move-coeff (o) nil)
 
 (defun response? (being) (< 0 (funcall (response being))))
 
@@ -243,16 +250,21 @@
                 :type key-tracker
                 :reader tracker)))
 
-(defclass effect (no-directional)
+(defclass phenomenon ()
   ((life :initform (parameter) :reader life :type parameter)
    (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
 
 (defmethod initialize-instance :after
-           ((o effect) &key effects (win (alexandria:required-argument :win)))
+           ((o phenomenon)
+            &key effects (win (alexandria:required-argument :win)))
   (setf (slot-value o 'effects)
           (loop :for constructor :in effects
                 :collect (funcall constructor win))))
+
+(defclass melee (phenomenon no-directional) ())
+
+(defclass projectile (phenomenon 8-directional) ())
 
 ;;;; DRAW
 
@@ -286,7 +298,34 @@
     (asignf vertices left top left bottom right top right bottom))
   (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
 
-(defmethod fude-gl:draw ((o 4-directional))
+(defmethod fude-gl:draw :before ((o 8-directional))
+  (let* ((unit (unit o))
+         (step
+          (if (updatep o)
+              (funcall (stepper o))
+              (last-step (stepper o))))
+         (left
+          (float
+            (* unit
+               (ecase (last-direction o)
+                 ((:n :s :e :w) step)
+                 ((:nw :ne :sw :se) (+ 3 step))))))
+         (right (+ left unit))
+         (bottom
+          (float
+            (ecase (last-direction o)
+              ((:n :ne) 0)
+              ((:s :sw) (* 3 unit))
+              ((:w :nw) (* 2 unit))
+              ((:e :se) unit))))
+         (top (+ bottom unit))
+         (vertices
+          (fude-gl:buffer-source
+            (fude-gl:buffer (fude-gl:find-vertices 'sprite-quad)))))
+    (asignf vertices left top left bottom right top right bottom))
+  (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
+
+(defmethod fude-gl:draw ((o being))
   (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0)
   (call-next-method))
 
@@ -311,7 +350,7 @@
             (asignf vertices left top left bottom right top right bottom))
           (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data)))))
 
-(defmethod fude-gl:draw ((o no-directional))
+(defmethod fude-gl:draw ((o phenomenon))
   (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875)
   (call-next-method))
 
@@ -373,7 +412,7 @@
                             (+ (quaspar:x o)
                                (coeff *pixel-size* (move-coeff o))))
                        (quaspar:y o) *colliders*)))
-  (defmethod move (o (win sdl2-ffi:sdl-window) &key direction animate)
+  (defmethod move ((o being) (win sdl2-ffi:sdl-window) &key direction animate)
     (ecase direction
       (:n (go-up o win))
       (:s (go-down o))
@@ -383,6 +422,35 @@
       (:ne (go-up o win) (go-right o win))
       (:sw (go-down o) (go-left o))
       (:se (go-down o) (go-right o win)))
+    (when animate
+      (setf (last-direction o) direction))))
+
+(flet ((go-down (o)
+         (quaspar:move o (quaspar:x o)
+                       (- (quaspar:y o) (coeff *pixel-size* (move-coeff o)))
+                       *colliders*))
+       (go-up (o)
+         (quaspar:move o (quaspar:x o)
+                       (+ (quaspar:y o) (coeff *pixel-size* (move-coeff o)))
+                       *colliders*))
+       (go-left (o)
+         (quaspar:move o (- (quaspar:x o) (coeff *pixel-size* (move-coeff o)))
+                       (quaspar:y o) *colliders*))
+       (go-right (o)
+         (quaspar:move o (+ (quaspar:x o) (coeff *pixel-size* (move-coeff o)))
+                       (quaspar:y o) *colliders*)))
+  (defmethod move
+             ((o phenomenon) (win sdl2-ffi:sdl-window) &key direction animate)
+    (declare (ignore win))
+    (ecase direction
+      (:n (go-up o))
+      (:s (go-down o))
+      (:e (go-right o))
+      (:w (go-left o))
+      (:nw (go-up o) (go-left o))
+      (:ne (go-up o) (go-right o))
+      (:sw (go-down o) (go-left o))
+      (:se (go-down o) (go-right o)))
     (when animate
       (setf (last-direction o) direction))))
 
@@ -435,11 +503,13 @@
       (when direction
         (call-next-method o win :direction direction :animate animate)))))
 
-(defmethod move
-           ((o being) (win sdl2-ffi:sdl-window) &key direction (animate t))
+(defmethod move ((o npc) (win sdl2-ffi:sdl-window) &key direction (animate t))
   (call-next-method o win :direction
    (or direction (aref #(:n :w :w :e :nw :ne :sw :se) (random 8))) :animate
    animate))
+
+(defmethod move ((o projectile) (win sdl2-ffi:sdl-window) &key)
+  (call-next-method o win :direction (last-direction o)))
 
 ;;;; COLLIDERS
 
@@ -533,9 +603,13 @@
 
 (defgeneric react (subject object) (:method (s o))) ; Do nothing.
 
-(defmethod react ((subject effect) (object 4-directional))
+(defmethod react ((subject phenomenon) (object being))
   (unless (eq (who subject) object)
     (dolist (effect (effects subject)) (funcall effect subject object))))
+
+(defmethod react ((subject projectile) (object being))
+  (call-next-method)
+  (setf (current (life subject)) 0))
 
 (defun damager (damage)
   (constantly
@@ -566,7 +640,7 @@
   (defun turn-direction (direction)
     (or (gethash direction turns) (error "Unknown direction ~S." direction))))
 
-(defmethod react ((subject 4-directional) (object effect))
+(defmethod react ((subject 4-directional) (object phenomenon))
   (react object subject))
 
 (defun front (player)
