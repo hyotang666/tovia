@@ -36,7 +36,7 @@
            #:tracker
            #:key-down-p
            #:key-tracker-time
-           #:update-keystate
+           #:keystate ; setfable
            #:current
            #:keypress-case))
 
@@ -87,17 +87,30 @@
 
 (defstruct key-tracker
   (state (make-array 256 :element-type 'bit) :type bit-vector)
+  (last-pressed-cursor :down :type (member :down :up :left :right))
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
-(defun keystate (tracker character)
-  (aref (key-tracker-state tracker) (char-code character)))
+(defun keyword-scancode (keyword)
+  (sdl2:scancode-key-to-value
+    (intern (format nil "SCANCODE-~A" keyword) :keyword)))
 
-(defun update-keystate (tracker character state)
-  (setf (aref (key-tracker-state tracker) (char-code character))
-          (ecase state (:down 1) (:up 0))))
+(defun keystate (tracker keyword)
+  ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
+  (aref (key-tracker-state tracker) (keyword-scancode keyword)))
 
-(defun key-down-p (tracker character)
-  (= 1 (aref (key-tracker-state tracker) (char-code character))))
+(defun (setf keystate) (new tracker keyword)
+  ;; TODO: Make this with DEFINE-SETF-EXPANDER for optimize.
+  (setf (aref (key-tracker-state tracker) (keyword-scancode keyword))
+          (ecase new (:down 1) (:up 0))))
+
+(defun key-down-p (tracker keyword)
+  ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
+  (= 1 (aref (key-tracker-state tracker) (keyword-scancode keyword))))
+
+(defun last-pressed-cursor (tracker) (key-tracker-last-pressed-cursor tracker))
+
+(defun (setf last-pressed-cursor) (new tracker)
+  (setf (key-tracker-last-pressed-cursor tracker) new))
 
 (defmethod print-object ((o key-tracker) stream)
   (print-unreadable-object (o stream :type t)))
@@ -205,11 +218,15 @@
 
 (defclass being ()
   ((life :initform (parameter) :reader life :type parameter)
+   (move-coeff :accessor move-coeff :type list :initform nil)
    (response :initarg :response :reader response :type timer)))
 
 (defmethod initialize-instance :after
            ((o being) &key (response (n-bits-max 7)))
   (setf (slot-value o 'response) (make-timer response)))
+
+(defun coeff (init coeff)
+  (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
 
 (defun response? (being) (< 0 (funcall (response being))))
 
@@ -324,68 +341,99 @@
                `(,(<keypress-pred> (car clause)) ,@(cdr clause))))
          clause+)))
 
+(defgeneric move (subject window &key))
+
 (flet ((go-down (o)
-         (quaspar:move o (quaspar:x o) (max 0 (- (quaspar:y o) *pixel-size*))
+         (quaspar:move o (quaspar:x o)
+                       (max 0
+                            (- (quaspar:y o)
+                               (coeff *pixel-size* (move-coeff o))))
                        *colliders*))
        (go-up (o win)
          (quaspar:move o (quaspar:x o)
                        (min
                          (- (nth-value 1 (sdl2:get-window-size win)) (boxel))
-                         (+ (quaspar:y o) *pixel-size*))
+                         (+ (quaspar:y o) (coeff *pixel-size* (move-coeff o))))
                        *colliders*))
        (go-left (o)
-         (quaspar:move o (max 0 (- (quaspar:x o) *pixel-size*)) (quaspar:y o)
-                       *colliders*))
+         (quaspar:move o
+                       (max 0
+                            (- (quaspar:x o)
+                               (coeff *pixel-size* (move-coeff o))))
+                       (quaspar:y o) *colliders*))
        (go-right (o win)
          (quaspar:move o
                        (min (- (sdl2:get-window-size win) (boxel))
-                            (+ (quaspar:x o) *pixel-size*))
+                            (+ (quaspar:x o)
+                               (coeff *pixel-size* (move-coeff o))))
                        (quaspar:y o) *colliders*)))
-  (defgeneric move (subject window &key)
-    (:method (o (win sdl2-ffi:sdl-window) &key direction animate)
-      (ecase direction
-        (:n (go-up o win))
-        (:s (go-down o))
-        (:e (go-right o win))
-        (:w (go-left o))
-        (:nw (go-up o win) (go-left o))
-        (:ne (go-up o win) (go-right o win))
-        (:sw (go-down o) (go-left o))
-        (:se (go-down o) (go-right o win)))
-      (when animate
-        (setf (last-direction o) direction)))
-    (:method ((o player) (win sdl2-ffi:sdl-window) &key (animate t) direction)
-      (let ((direction
-             (or direction
-                 (keypress-case
-                   (:down
-                    (keypress-case
-                      (:left :sw)
-                      (:right :se)
-                      (otherwise :s)))
-                   (:up
-                    (keypress-case
-                      (:left :nw)
-                      (:right :ne)
-                      (otherwise :n)))
-                   (:right
-                    (keypress-case
-                      (:up :ne)
-                      (:down :se)
-                      (otherwise :e)))
-                   (:left
-                    (keypress-case
-                      (:up :nw)
-                      (:down :sw)
-                      (otherwise :w)))))))
-        (when direction
-          (call-next-method o win :direction direction :animate animate))))
-    (:method ((o being) (win sdl2-ffi:sdl-window) &key direction (animate t))
-      (call-next-method o win
-                        :direction (or direction
-                                       (aref #(:n :w :w :e :nw :ne :sw :se)
-                                             (random 8)))
-                        :animate animate))))
+  (defmethod move (o (win sdl2-ffi:sdl-window) &key direction animate)
+    (ecase direction
+      (:n (go-up o win))
+      (:s (go-down o))
+      (:e (go-right o win))
+      (:w (go-left o))
+      (:nw (go-up o win) (go-left o))
+      (:ne (go-up o win) (go-right o win))
+      (:sw (go-down o) (go-left o))
+      (:se (go-down o) (go-right o win)))
+    (when animate
+      (setf (last-direction o) direction))))
+
+(defmethod move
+           ((o player) (win sdl2-ffi:sdl-window) &key (animate t) direction)
+  (flet ((update (tracker cursor)
+           (if (not (eq cursor (last-pressed-cursor tracker)))
+               ;; First time to press cursor.
+               (setf (last-pressed-cursor tracker) cursor
+                     (keystate tracker cursor) :down)
+               (if (key-down-p tracker cursor)
+                   ;; Keep on pressing.
+                   nil
+                   ;; Once :up but secondary press cursor.
+                   (setf (keystate tracker cursor) :down
+                         (move-coeff o)
+                           (acons :dush (lambda (x) (* 2 x))
+                                  (move-coeff o)))))))
+    (let* ((direction
+            (or direction
+                (keypress-case
+                  (:down (update (tracker o) :down)
+                   (keypress-case
+                     (:left :sw)
+                     (:right :se)
+                     (otherwise :s)))
+                  (:up (update (tracker o) :up)
+                   (keypress-case
+                     (:left :nw)
+                     (:right :ne)
+                     (otherwise :n)))
+                  (:right (update (tracker o) :right)
+                   (keypress-case
+                     (:up :ne)
+                     (:down :se)
+                     (otherwise :e)))
+                  (:left (update (tracker o) :left)
+                   (keypress-case
+                     (:up :nw)
+                     (:down :sw)
+                     (otherwise :w)))
+                  (otherwise
+                    (setf (keystate (tracker o) :up) :up
+                          (keystate (tracker o) :down) :up
+                          (keystate (tracker o) :left) :up
+                          (keystate (tracker o) :right) :up
+                          (move-coeff o)
+                            (delete :dush (move-coeff o) :key #'car))
+                    nil)))))
+      (when direction
+        (call-next-method o win :direction direction :animate animate)))))
+
+(defmethod move
+           ((o being) (win sdl2-ffi:sdl-window) &key direction (animate t))
+  (call-next-method o win :direction
+   (or direction (aref #(:n :w :w :e :nw :ne :sw :se) (random 8))) :animate
+   animate))
 
 ;;;; COLLIDERS
 
