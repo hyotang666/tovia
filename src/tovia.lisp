@@ -89,7 +89,8 @@
 
 (defstruct key-tracker
   (state (make-array 256 :element-type 'bit) :type bit-vector)
-  (last-pressed-cursor :down :type (member :down :up :left :right))
+  (last-pressed-cursor nil :type (member nil :down :up :left :right))
+  (life (parameter) :type parameter :read-only t)
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
 (defun keyword-scancode (keyword)
@@ -461,6 +462,7 @@
            (if (not (eq cursor (last-pressed-cursor tracker)))
                ;; First time to press cursor.
                (setf (last-pressed-cursor tracker) cursor
+                     (current (key-tracker-life tracker)) 5
                      (keystate tracker cursor) :down)
                (if (key-down-p tracker cursor)
                    ;; Keep on pressing.
@@ -494,13 +496,20 @@
                      (:down :sw)
                      (otherwise :w)))
                   (otherwise
-                    (setf (keystate (tracker o) :up) :up
-                          (keystate (tracker o) :down) :up
-                          (keystate (tracker o) :left) :up
-                          (keystate (tracker o) :right) :up
-                          (move-coeff o)
-                            (delete :dush (move-coeff o) :key #'car))
-                    nil)))))
+                    (let ((tracker (tracker o)))
+                      (setf (keystate tracker :up) :up
+                            (keystate tracker :down) :up
+                            (keystate tracker :left) :up
+                            (keystate tracker :right) :up
+                            (current (key-tracker-life tracker))
+                              (1- (current (key-tracker-life tracker)))
+                            (last-pressed-cursor tracker)
+                              (if (<= (current (key-tracker-life tracker)) 0)
+                                  nil
+                                  (last-pressed-cursor tracker))
+                            (move-coeff o)
+                              (delete :dush (move-coeff o) :key #'car))
+                      nil))))))
       (when direction
         (call-next-method o win :direction direction :animate animate)))))
 
