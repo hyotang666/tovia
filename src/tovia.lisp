@@ -14,7 +14,7 @@
            #:*pixel-size*
            #:defsprite
            #:sprite
-           #:4-directional
+           #:npc
            #:response?
            #:effect
            #:damager
@@ -230,14 +230,20 @@
 
 (defun response? (being) (< 0 (funcall (response being))))
 
-(defclass 4-directional (sprite directional being) ())
+(defclass no-directional (sprite) ())
 
-(defclass player (4-directional)
+(defclass 4-directional (sprite directional) ())
+
+(defclass 8-directional (sprite directional) ())
+
+(defclass npc (4-directional being) ())
+
+(defclass player (4-directional being)
   ((key-tracker :initform (make-key-tracker)
                 :type key-tracker
                 :reader tracker)))
 
-(defclass effect (sprite)
+(defclass effect (no-directional)
   ((life :initform (parameter) :reader life :type parameter)
    (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
@@ -284,7 +290,7 @@
   (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0)
   (call-next-method))
 
-(defmethod fude-gl:draw :before ((o effect))
+(defmethod fude-gl:draw :before ((o no-directional))
   (let ((step
          (if (updatep o)
              (funcall (stepper o))
@@ -305,7 +311,7 @@
             (asignf vertices left top left bottom right top right bottom))
           (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data)))))
 
-(defmethod fude-gl:draw ((o effect))
+(defmethod fude-gl:draw ((o no-directional))
   (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875)
   (call-next-method))
 
