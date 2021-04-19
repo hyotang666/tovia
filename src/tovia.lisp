@@ -251,16 +251,17 @@
                 :reader tracker)))
 
 (defclass phenomenon ()
-  ((life :initform (parameter) :reader life :type parameter)
+  ((life :initarg :life :reader life :type parameter)
    (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
 
 (defmethod initialize-instance :after
            ((o phenomenon)
-            &key effects (win (alexandria:required-argument :win)))
+            &key effects (win (alexandria:required-argument :win)) (life 100))
   (setf (slot-value o 'effects)
           (loop :for constructor :in effects
-                :collect (funcall constructor win))))
+                :collect (funcall constructor win))
+        (slot-value o 'life) (make-parameter life)))
 
 (defclass melee (phenomenon no-directional) ())
 
