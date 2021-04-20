@@ -97,7 +97,8 @@
   (state (make-array 256 :element-type 'bit) :type bit-vector)
   (last-pressed-cursor nil :type (member nil :down :up :left :right))
   (life (parameter) :type parameter :read-only t)
-  (last-pressed (alexandria:circular-list nil nil nil) :type list)
+  (last-pressed (alexandria:circular-list (list nil) (list nil) (list nil))
+                :type list)
   (command-life (parameter) :type parameter :read-only t)
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
@@ -108,9 +109,14 @@
 (defun (setf last-pressed-cursor) (new tracker)
   (setf (key-tracker-last-pressed-cursor tracker) new))
 
+(defun last-pressed (tracker) (car (key-tracker-last-pressed tracker)))
+
 (defun (setf last-pressed) (new tracker)
   (setf (key-tracker-last-pressed tracker)
-          (rplaca (cdr (key-tracker-last-pressed tracker)) new)))
+          (rplaca (cdr (key-tracker-last-pressed tracker))
+                  (rplacd
+                    (rplaca (cadr (key-tracker-last-pressed tracker)) new)
+                    (get-internal-real-time)))))
 
 (defun keystate (tracker keyword)
   ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
@@ -130,17 +136,23 @@
 
 (defun last-pressed-cursor (tracker) (key-tracker-last-pressed-cursor tracker))
 
-(defun command-input-p (command tracker)
+(defun command-input-p
+       (command tracker delta &key (time (get-internal-real-time)) only-press)
   (let ((first (key-tracker-last-pressed tracker)))
     (labels ((rec (cache acc)
                (if (eq first cache)
                    (loop :for (input . rest) :on (reverse command) ; Don't
                                                                    ; NREVERSE!
-                         :for (cache . rest2) :on (cons (car first) acc)
+                         :for ((cache . past) . rest2)
+                              :on (if only-press
+                                      (delete nil (cons (car first) acc)
+                                              :key #'car)
+                                      (cons (car first) acc))
+                         :with now := time
                          :when (and rest (endp rest2))
-                           :do (error "Exhausting last pressed cache. ~S"
-                                      command)
-                         :always (eq input cache))
+                           :return nil
+                         :always (and (eq input cache)
+                                      (< 0 (- now (setf now past)) delta)))
                    (rec (cdr cache) (cons (car cache) acc)))))
       (rec (cdr first) nil))))
 
