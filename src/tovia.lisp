@@ -16,6 +16,7 @@
            #:sprite
            #:npc
            #:response?
+           #:effect
            #:melee
            #:projectile
            #:last-direction
@@ -23,7 +24,8 @@
            #:knock-backer
            #:who
            #:player
-           #:move-coeff
+           #:coeff-of
+           #:apply-coeff
            #:being
            #:life
            #:deadp
@@ -251,17 +253,21 @@
 
 (defclass being ()
   ((life :initform (parameter) :reader life :type parameter)
-   (move-coeff :accessor move-coeff :type list :initform nil)
+   (coeff :reader coeff
+          :type hash-table
+          :initform (make-hash-table :test #'eq))
    (response :initarg :response :reader response :type timer)))
 
 (defmethod initialize-instance :after
            ((o being) &key (response (n-bits-max 7)))
   (setf (slot-value o 'response) (make-timer response)))
 
-(defun coeff (init coeff)
-  (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
+(defun coeff-of (name o) (gethash name (coeff o)))
 
-(defmethod move-coeff (o) nil)
+(defun (setf coeff-of) (new name o) (setf (gethash name (coeff o)) new))
+
+(defun apply-coeff (init coeff)
+  (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
 
 (defun response? (being) (< 0 (funcall (response being))))
 
@@ -291,7 +297,9 @@
                 :collect (funcall constructor win))
         (slot-value o 'life) (make-parameter life)))
 
-(defclass melee (phenomenon no-directional) ())
+(defclass effect (phenomenon no-directional) ())
+
+(defclass melee (phenomenon 8-directional) ())
 
 (defclass projectile (phenomenon 8-directional) ())
 
@@ -421,25 +429,26 @@
          (quaspar:move o (quaspar:x o)
                        (max 0
                             (- (quaspar:y o)
-                               (coeff *pixel-size* (move-coeff o))))
+                               (apply-coeff *pixel-size* (coeff-of :move o))))
                        *colliders*))
        (go-up (o win)
          (quaspar:move o (quaspar:x o)
                        (min
                          (- (nth-value 1 (sdl2:get-window-size win)) (boxel))
-                         (+ (quaspar:y o) (coeff *pixel-size* (move-coeff o))))
+                         (+ (quaspar:y o)
+                            (apply-coeff *pixel-size* (coeff-of :move o))))
                        *colliders*))
        (go-left (o)
          (quaspar:move o
                        (max 0
                             (- (quaspar:x o)
-                               (coeff *pixel-size* (move-coeff o))))
+                               (apply-coeff *pixel-size* (coeff-of :move o))))
                        (quaspar:y o) *colliders*))
        (go-right (o win)
          (quaspar:move o
                        (min (- (sdl2:get-window-size win) (boxel))
                             (+ (quaspar:x o)
-                               (coeff *pixel-size* (move-coeff o))))
+                               (apply-coeff *pixel-size* (coeff-of :move o))))
                        (quaspar:y o) *colliders*)))
   (defmethod move ((o being) (win sdl2-ffi:sdl-window) &key direction animate)
     (ecase direction
@@ -455,19 +464,17 @@
       (setf (last-direction o) direction))))
 
 (flet ((go-down (o)
-         (quaspar:move o (quaspar:x o)
-                       (- (quaspar:y o) (coeff *pixel-size* (move-coeff o)))
+         (quaspar:move o (quaspar:x o) (- (quaspar:y o) *pixel-size*)
                        *colliders*))
        (go-up (o)
-         (quaspar:move o (quaspar:x o)
-                       (+ (quaspar:y o) (coeff *pixel-size* (move-coeff o)))
+         (quaspar:move o (quaspar:x o) (+ (quaspar:y o) *pixel-size*)
                        *colliders*))
        (go-left (o)
-         (quaspar:move o (- (quaspar:x o) (coeff *pixel-size* (move-coeff o)))
-                       (quaspar:y o) *colliders*))
+         (quaspar:move o (- (quaspar:x o) *pixel-size*) (quaspar:y o)
+                       *colliders*))
        (go-right (o)
-         (quaspar:move o (+ (quaspar:x o) (coeff *pixel-size* (move-coeff o)))
-                       (quaspar:y o) *colliders*)))
+         (quaspar:move o (+ (quaspar:x o) *pixel-size*) (quaspar:y o)
+                       *colliders*)))
   (defmethod move
              ((o phenomenon) (win sdl2-ffi:sdl-window) &key direction animate)
     (declare (ignore win))
@@ -496,9 +503,9 @@
                    nil
                    ;; Once :up but secondary press cursor.
                    (setf (keystate tracker cursor) :down
-                         (move-coeff o)
+                         (coeff-of :move o)
                            (acons :dush (lambda (x) (* 2 x))
-                                  (move-coeff o)))))))
+                                  (coeff-of :move o)))))))
     (let* ((direction
             (or direction
                 (keypress-case
@@ -534,8 +541,8 @@
                               (if (<= (current (key-tracker-life tracker)) 0)
                                   nil
                                   (last-pressed-cursor tracker))
-                            (move-coeff o)
-                              (delete :dush (move-coeff o) :key #'car))
+                            (coeff-of :move o)
+                              (delete :dush (coeff-of :move o) :key #'car))
                       nil))))))
       (when direction
         (call-next-method o win :direction direction :animate animate)))))
