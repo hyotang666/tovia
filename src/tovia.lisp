@@ -39,7 +39,10 @@
            #:tracker
            #:key-down-p
            #:key-tracker-time
+           #:key-tracker-command-life
            #:keystate ; setfable
+           #:last-pressed ; setfable
+           #:command-input-p
            #:current
            #:keypress-case))
 
@@ -92,18 +95,30 @@
   (state (make-array 256 :element-type 'bit) :type bit-vector)
   (last-pressed-cursor nil :type (member nil :down :up :left :right))
   (life (parameter) :type parameter :read-only t)
+  (last-pressed (alexandria:circular-list nil nil nil) :type list)
+  (command-life (parameter) :type parameter :read-only t)
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
 (defun keyword-scancode (keyword)
   (sdl2:scancode-key-to-value
     (intern (format nil "SCANCODE-~A" keyword) :keyword)))
 
+(defun (setf last-pressed-cursor) (new tracker)
+  (setf (key-tracker-last-pressed-cursor tracker) new))
+
+(defun (setf last-pressed) (new tracker)
+  (setf (key-tracker-last-pressed tracker)
+          (rplaca (cdr (key-tracker-last-pressed tracker)) new)))
+
 (defun keystate (tracker keyword)
   ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
   (aref (key-tracker-state tracker) (keyword-scancode keyword)))
 
 (defun (setf keystate) (new tracker keyword)
-  ;; TODO: Make this with DEFINE-SETF-EXPANDER for optimize.
+  (when (and (eq :down new)
+             ;; To ignore cursor.
+             (not (find keyword '(:down :up :left :right))))
+    (setf (last-pressed tracker) keyword))
   (setf (aref (key-tracker-state tracker) (keyword-scancode keyword))
           (ecase new (:down 1) (:up 0))))
 
@@ -113,8 +128,19 @@
 
 (defun last-pressed-cursor (tracker) (key-tracker-last-pressed-cursor tracker))
 
-(defun (setf last-pressed-cursor) (new tracker)
-  (setf (key-tracker-last-pressed-cursor tracker) new))
+(defun command-input-p (command tracker)
+  (let ((first (key-tracker-last-pressed tracker)))
+    (labels ((rec (cache acc)
+               (if (eq first cache)
+                   (loop :for (input . rest) :on (reverse command) ; Don't
+                                                                   ; NREVERSE!
+                         :for (cache . rest2) :on (cons (car first) acc)
+                         :when (and rest (endp rest2))
+                           :do (error "Exhausting last pressed cache. ~S"
+                                      command)
+                         :always (eq input cache))
+                   (rec (cdr cache) (cons (car cache) acc)))))
+      (rec (cdr first) nil))))
 
 (defmethod print-object ((o key-tracker) stream)
   (print-unreadable-object (o stream :type t)))
