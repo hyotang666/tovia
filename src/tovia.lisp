@@ -302,7 +302,7 @@
 
 (defun response? (being) (< 0 (funcall (response being))))
 
-(defclass no-directional (sprite) ())
+(defclass no-directional (sprite directional) ())
 
 (defclass 4-directional (sprite directional) ())
 
@@ -695,11 +695,8 @@
 (defun knock-backer (powor)
   (lambda (win)
     (lambda (subject object)
-      (declare (ignore subject))
       (let ((*pixel-size* powor))
-        (move object win
-              :direction (turn-direction (last-direction object))
-              :animate nil)))))
+        (move object win :direction (last-direction subject) :animate nil)))))
 
 (let ((turns (make-hash-table :test #'eq)))
   (flet ((def (a b)
