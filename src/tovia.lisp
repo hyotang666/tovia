@@ -804,10 +804,10 @@
 
 (defun hello-tovia (win)
   (uiop:nest
-    (fude-gl:with-text-renderer (text :win win :size 32))
+    (fude-gl:with-text (win :size 32))
     (sdl2:with-event-loop (:method :poll)
       (:quit ()
         t))
     (:idle nil)
     (fude-gl:with-clear (win (:color-buffer-bit))
-      (text "Hello tovia." :x :center :y :center))))
+      (fude-gl:render-text "Hello tovia." :x :center :y :center :win win))))

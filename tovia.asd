@@ -3,7 +3,7 @@
 (defsystem "tovia"
   :description "2D Top View Action game framework."
   :version
-  "0.22.3"
+  "0.22.4"
   :depends-on
   (
    "cl-opengl" ; opengl bindings.
