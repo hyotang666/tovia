@@ -162,11 +162,11 @@
   (let ((a
          (if (constantp a)
              (* (eval a) internal-time-units-per-second)
-             a))
+             `(* ,a internal-time-units-per-second)))
         (b
          (if (constantp b)
              (* (eval b) internal-time-units-per-second)
-             b)))
+             `(* ,b internal-time-units-per-second))))
     `(lambda (delta) (< ,a delta ,b))))
 
 (defun discrete-time (a b)
