@@ -101,6 +101,11 @@
                 :type list)
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
+(define-compiler-macro keyword-scancode (&whole whole keyword)
+  (if (constantp keyword)
+      (keyword-scancode (eval keyword))
+      whole))
+
 (defun keyword-scancode (keyword)
   (sdl2:scancode-key-to-value
     (intern (format nil "SCANCODE-~A" keyword) :keyword)))
