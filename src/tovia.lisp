@@ -44,6 +44,7 @@
            #:key-tracker-command-life
            #:keystate ; setfable
            #:last-pressed ; setfable
+           #:discrete-time
            #:command-input-p
            #:current
            #:keypress-case))
@@ -158,6 +159,23 @@
                                     (funcall delta (- now (setf now past))))
                          (return nil)))))))
       (rec (cdr first) nil))))
+
+(define-compiler-macro discrete-time (a b)
+  (let ((a
+         (if (constantp a)
+             (* (eval a) internal-time-units-per-second)
+             a))
+        (b
+         (if (constantp b)
+             (* (eval b) internal-time-units-per-second)
+             b)))
+    `(lambda (delta) (< ,a delta ,b))))
+
+(defun discrete-time (a b)
+  (flet ((discrete-time (delta)
+           (< (* a internal-time-units-per-second) delta
+              (* b internal-time-units-per-second))))
+    #'discrete-time))
 
 (defmethod print-object ((o key-tracker) stream)
   (print-unreadable-object (o stream :type t)))
