@@ -137,23 +137,26 @@
 (defun last-pressed-cursor (tracker) (key-tracker-last-pressed-cursor tracker))
 
 (defun command-input-p
-       (command tracker delta &key (time (get-internal-real-time)) only-press)
+       (command tracker delta &key (time (get-internal-real-time)))
+  ;; FIXME: Too much consing. Doubly linked list is better.
   (let ((first (key-tracker-last-pressed tracker)))
     (labels ((rec (cache acc)
-               (if (eq first cache)
-                   (loop :for (input . rest) :on (reverse command) ; Don't
-                                                                   ; NREVERSE!
-                         :for ((cache . past) . rest2)
-                              :on (if only-press
-                                      (delete nil (cons (car first) acc)
-                                              :key #'car)
-                                      (cons (car first) acc))
-                         :with now := time
-                         :when (and rest (endp rest2))
-                           :return nil
-                         :always (and (eq input cache)
-                                      (< 0 (- now (setf now past)) delta)))
-                   (rec (cdr cache) (cons (car cache) acc)))))
+               (if (not (eq first cache))
+                   (rec (cdr cache) (cons (car cache) acc))
+                   (do* ((coms (reverse command) ; Don't NREVERSE!
+                               (cdr coms))
+                         (input (car coms) (car coms))
+                         (cache (cons (car first) acc) (cdr cache))
+                         (now time))
+                        ((endp coms) t)
+                     (when (endp cache)
+                       (return nil))
+                     (destructuring-bind
+                         (key . past)
+                         (car cache)
+                       (unless (and (eq input key)
+                                    (funcall delta (- now (setf now past))))
+                         (return nil)))))))
       (rec (cdr first) nil))))
 
 (defmethod print-object ((o key-tracker) stream)
