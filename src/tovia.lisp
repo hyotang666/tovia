@@ -41,7 +41,6 @@
            #:tracker
            #:key-down-p
            #:key-tracker-time
-           #:key-tracker-command-life
            #:keystate ; setfable
            #:last-pressed ; setfable
            #:discrete-time
@@ -100,7 +99,6 @@
   (life (parameter) :type parameter :read-only t)
   (last-pressed (alexandria:circular-list (list nil) (list nil) (list nil))
                 :type list)
-  (command-life (parameter) :type parameter :read-only t)
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
 (defun keyword-scancode (keyword)
