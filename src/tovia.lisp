@@ -105,6 +105,7 @@
   (time (parameter :max 30 :current 0) :type parameter :read-only t))
 
 (define-compiler-macro keyword-scancode (&whole whole keyword)
+  (declare (notinline keyword-scancode))
   (if (constantp keyword)
       (keyword-scancode (eval keyword))
       whole))
