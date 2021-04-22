@@ -16,6 +16,7 @@
            #:sprite
            #:npc
            #:response?
+           #:phenomenon
            #:effect
            #:melee
            #:projectile
