@@ -832,6 +832,7 @@
     (with-sounds (server))
     (with-colliders (:win win))
     (fude-gl:with-shader ())
+    (fude-gl:with-text (win))
     (fude-gl:with-textures ())
     (sequence-handler-bind (fun scene)
       (quaspar:clear-lqtree *colliders*)
@@ -842,7 +843,6 @@
 
 (defun hello-tovia (win)
   (uiop:nest
-    (fude-gl:with-text (win :size 32))
     (sdl2:with-event-loop (:method :poll)
       (:quit ()
         t))
