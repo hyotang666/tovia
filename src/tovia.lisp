@@ -687,9 +687,12 @@
   (unless (eq (who subject) object)
     (dolist (effect (effects subject)) (funcall effect subject object))))
 
-(defmethod react ((subject projectile) (object being))
-  (call-next-method)
+(defmethod react ((object being) (subject phenomenon)) (react subject object))
+
+(defmethod react :after ((subject projectile) (object being))
   (setf (current (life subject)) 0))
+
+(defmethod react ((object being) (subject projectile)) (react subject object))
 
 (defun damager (damage)
   (constantly
