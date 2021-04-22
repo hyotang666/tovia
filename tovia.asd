@@ -3,7 +3,7 @@
 (defsystem "tovia"
   :description "2D Top View Action game framework."
   :version
-  "0.23.1"
+  "0.24.0"
   :depends-on
   (
    "cl-opengl" ; opengl bindings.
@@ -15,6 +15,7 @@
    "3d-vectors" ; Vector operations.
    "3d-matrices" ; Matrix operations.
    "quaspar" ; collision detection.
+   "harmony" ; Audio processing server.
    )
   :pathname
   "src/"

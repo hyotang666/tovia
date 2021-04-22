@@ -46,7 +46,9 @@
            #:discrete-time
            #:command-input-p
            #:current
-           #:keypress-case))
+           #:keypress-case
+           #:defsound
+           #:play))
 
 (in-package :tovia)
 
@@ -788,6 +790,31 @@
                          (go :top))))
          ,@body))))
 
+;;;; DEFSOUND
+
+(defparameter *sounds* (make-hash-table :test #'eq))
+
+(defun list-all-sounds () (alexandria:hash-table-keys *sounds*))
+
+(defun sound (name)
+  (or (gethash name *sounds*)
+      (error "Unknown sound ~S: Eval (list-all-sounds)." name)))
+
+(defmacro defsound (name pathname)
+  `(setf (gethash ',name *sounds*) (truename ,pathname)))
+
+(defmacro with-sounds ((var) &body body)
+  `(symbol-macrolet ((,var org.shirakumo.fraf.harmony:*server*))
+     (org.shirakumo.fraf.harmony:maybe-start-simple-server)
+     (unwind-protect (progn ,@body) (org.shirakumo.fraf.harmony:stop ,var))))
+
+(defun play (name &key repeat (mixer :effect))
+  (org.shirakumo.fraf.harmony:play (sound name)
+                                   :name name
+                                   :mixer mixer
+                                   :if-exists :restart
+                                   :repeat repeat))
+
 ;;;; MAIN
 
 (defun main (&optional (scene *scene*))
@@ -800,6 +827,7 @@
     (sdl2:with-gl-context (context win)
       (gl:enable :blend)
       (gl:blend-func :src-alpha :one-minus-src-alpha))
+    (with-sounds (server))
     (with-colliders (:win win))
     (fude-gl:with-shader ())
     (fude-gl:with-textures ())
