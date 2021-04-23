@@ -35,6 +35,7 @@
            #:front
            #:move
            #:target-direction
+           #:in-sight-p
            #:list-all-sprites
            #:add
            #:delete-lives
