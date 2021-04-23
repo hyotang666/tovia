@@ -17,6 +17,7 @@
            #:npc
            #:response?
            #:phenomenon
+           #:victimp
            #:effect
            #:melee
            #:projectile
@@ -330,6 +331,7 @@
 
 (defclass phenomenon ()
   ((life :initarg :life :reader life :type parameter)
+   (victims :initform (make-hash-table) :type hash-table :reader victims)
    (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
 
@@ -340,6 +342,11 @@
           (loop :for constructor :in effects
                 :collect (funcall constructor win))
         (slot-value o 'life) (make-parameter life)))
+
+(defun add-victim (being phenomenon)
+  (setf (gethash being (victims phenomenon)) t))
+
+(defun victimp (being phenomenon) (values (gethash being (victims phenomenon))))
 
 (defclass effect (phenomenon no-directional) ())
 
@@ -692,7 +699,8 @@
 (defgeneric react (subject object) (:method (s o))) ; Do nothing.
 
 (defmethod react ((subject phenomenon) (object being))
-  (unless (eq (who subject) object)
+  (when (and (not (eq (who subject) object)) (not (victimp object subject)))
+    (add-victim object subject)
     (dolist (effect (effects subject)) (funcall effect subject object))))
 
 (defmethod react ((object being) (subject phenomenon)) (react subject object))
