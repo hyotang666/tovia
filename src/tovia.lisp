@@ -48,6 +48,7 @@
            #:discrete-time
            #:command-input-p
            #:current
+           #:max-of
            #:keypress-case
            #:defsound
            #:play))
@@ -699,11 +700,10 @@
 
 (defmethod react ((object being) (subject projectile)) (react subject object))
 
-(defun damager (damage)
+(defun damager (damage &optional coeff)
   (constantly
     (lambda (subject object)
-      (declare (ignore subject))
-      (decf (current (life object)) damage))))
+      (decf (current (life object)) (funcall coeff subject object damage)))))
 
 (defun knock-backer (powor)
   (lambda (win)
