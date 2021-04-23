@@ -47,6 +47,8 @@
            #:last-pressed ; setfable
            #:discrete-time
            #:command-input-p
+           #:parameter
+           #:make-parameter
            #:current
            #:max-of
            #:keypress-case
