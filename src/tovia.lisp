@@ -700,7 +700,7 @@
 
 (defmethod react ((object being) (subject projectile)) (react subject object))
 
-(defun damager (damage &optional coeff)
+(defun damager (damage &optional (coeff (constantly damage)))
   (constantly
     (lambda (subject object)
       (decf (current (life object)) (funcall coeff subject object damage)))))
