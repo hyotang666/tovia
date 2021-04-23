@@ -636,11 +636,11 @@
              (or (< b-top a-top b-bottom) (< b-top a-bottom b-bottom)))))))
 
 (defun in-sight-p (a b distance)
-  (<
-    (sqrt
-      (+ (expt (- (quaspar:x a) (quaspar:x b)) 2)
-         (expt (- (quaspar:y a) (quaspar:y b)) 2)))
-    distance))
+  (let ((v
+         (sqrt
+           (+ (expt (- (quaspar:x a) (quaspar:x b)) 2)
+              (expt (- (quaspar:y a) (quaspar:y b)) 2)))))
+    (values (< v distance) v)))
 
 (defun compass (lat1 lon1 lat2 lon2)
   (labels ((radian (degree)
