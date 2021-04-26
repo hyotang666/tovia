@@ -319,7 +319,9 @@
            ((o being) &key (response (n-bits-max 7)))
   (setf (slot-value o 'response) (make-timer response)))
 
-(defun coeff-of (name o) (gethash name (coeff o)))
+(defparameter *coeffs* nil)
+
+(defun coeff-of (name o) (append *coeffs* (gethash name (coeff o))))
 
 (defun (setf coeff-of) (new name o) (setf (gethash name (coeff o)) new))
 
@@ -747,7 +749,7 @@
 (defun knock-backer (powor)
   (lambda (win)
     (lambda (subject object)
-      (let ((*pixel-size* powor))
+      (let ((*coeffs* (acons :move (constantly powor) *coeffs*)))
         (move object win :direction (last-direction subject) :animate nil)
         (values)))))
 
