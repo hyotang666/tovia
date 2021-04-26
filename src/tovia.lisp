@@ -38,8 +38,6 @@
            #:response?
            ;; Coeff protocols
            #:apply-coeff
-           #:damager
-           #:knock-backer
            ;; Subclasses
            #:npc
            #:player)
@@ -47,6 +45,9 @@
            #:phenomenon ; class name
            #:who ; reader
            #:victimp
+           ;; Reaction protocols.
+           #:damager
+           #:knock-backer
            ;; Subclasses
            #:effect
            #:melee
@@ -720,16 +721,35 @@
 
 (defmethod react ((object being) (subject projectile)) (react subject object))
 
+(declaim ;; Reaction protocols.
+         ;; These functions must return function which is initializer.
+         ;; (See DEFSPRITE.)
+         ;; The initializers that is funcalled object construct time
+         ;; must return function which is reactor.
+         ;; (See REACT.)
+         ;; The reactors that is funcalled collision detected time
+         ;; destructively modify arguments.
+         (ftype (function *
+                 (values (function (sdl2-ffi:sdl-window)
+                          (values (function (phenomenon being)
+                                   (values &optional))
+                                  &optional))
+                         &optional))
+                damager
+                knock-backer))
+
 (defun damager (damage &optional (coeff (constantly damage)))
   (constantly
     (lambda (subject object)
-      (decf (current (life object)) (funcall coeff subject object damage)))))
+      (decf (current (life object)) (funcall coeff subject object damage))
+      (values))))
 
 (defun knock-backer (powor)
   (lambda (win)
     (lambda (subject object)
       (let ((*pixel-size* powor))
-        (move object win :direction (last-direction subject) :animate nil)))))
+        (move object win :direction (last-direction subject) :animate nil)
+        (values)))))
 
 (let ((turns (make-hash-table :test #'eq)))
   (flet ((def (a b)
