@@ -2,59 +2,70 @@
 
 (defpackage :tovia
   (:use :cl)
-  (:export #:*title*
+  (:export ;;;; Specials
+           #:*title*
            #:*scene*
-           #:main
            #:*width*
            #:*height*
-           #:*colliders*
-           #:collidep
-           #:react
-           #:boxel
            #:*pixel-size*
-           #:defsprite
-           #:sprite
-           #:npc
+           #:*colliders*)
+  (:export ;;;; PARAMETER
+           #:parameter ; type name, constructor
+           #:make-parameter ; constructor
+           #:current ; accessor
+           #:max-of ; accessor
+           )
+  (:export ;;;; KEY-TRACKER
+           #:key-tracker ; type-name, reader
+           #:key-tracker-time ; reader
+           #:keystate ; accessor
+           #:last-pressed ; accessor
+           #:key-down-p
+           #:command-input-p
+           #:discrete-time)
+  (:export ;;;; SPRITE
+           #:defsprite ; dsl-macro
+           #:list-all-sprites ; dev-helper
+           #:sprite ; class-name
+           #:x
+           #:y)
+  (:export ;;;; DIRECTIONAL
+           #:last-direction)
+  (:export ;;;; BEING
+           #:being ; class-name
+           #:life ; reader
+           #:coeff-of ; reader
            #:response?
-           #:phenomenon
-           #:victimp
-           #:effect
-           #:melee
-           #:projectile
-           #:last-direction
+           ;; Coeff protocols
+           #:apply-coeff
            #:damager
            #:knock-backer
-           #:who
-           #:player
-           #:coeff-of
-           #:apply-coeff
-           #:being
-           #:life
-           #:deadp
-           #:x
-           #:y
-           #:front
-           #:move
-           #:target-direction
-           #:in-sight-p
-           #:list-all-sprites
+           ;; Subclasses
+           #:npc
+           #:player)
+  (:export ;;;; PHENOMENON
+           #:phenomenon ; class name
+           #:who ; reader
+           #:victimp
+           ;; Subclasses
+           #:effect
+           #:melee
+           #:projectile)
+  (:export ;;;; COLLISION
+           #:collidep
            #:add
            #:delete-lives
-           #:sequence-transition
-           #:tracker
-           #:key-down-p
-           #:key-tracker-time
-           #:keystate ; setfable
-           #:last-pressed ; setfable
-           #:discrete-time
-           #:command-input-p
-           #:parameter
-           #:make-parameter
-           #:current
-           #:max-of
+           #:deadp)
+  (:export ;;;; GENERIC-FUNCTIONS
+           #:move
+           #:react)
+  (:export ;;;; helpers
            #:keypress-case
-           #:defsound
-           #:play))
+           #:boxel
+           #:front
+           #:in-sight-p
+           #:target-direction)
+  (:export #:main #:sequence-transition #:defsound #:play))
 
 (in-package :tovia)
 
@@ -232,7 +243,7 @@
 
 (defun make-timer (speed) (make-instance 'timer :speed speed))
 
-;;;; SPLITE
+;;;; SPRITE
 ;; SHADER
 
 (fude-gl:defshader sprite-shader 330 (fude-gl:xy fude-gl:st)
@@ -327,7 +338,7 @@
 (defclass player (4-directional being)
   ((key-tracker :initform (make-key-tracker)
                 :type key-tracker
-                :reader tracker)))
+                :reader key-tracker)))
 
 (defclass phenomenon ()
   ((life :initarg :life :reader life :type parameter)
@@ -560,28 +571,28 @@
     (let* ((direction
             (or direction
                 (keypress-case
-                  (:down (update (tracker o) :down)
+                  (:down (update (key-tracker o) :down)
                    (keypress-case
                      (:left :sw)
                      (:right :se)
                      (otherwise :s)))
-                  (:up (update (tracker o) :up)
+                  (:up (update (key-tracker o) :up)
                    (keypress-case
                      (:left :nw)
                      (:right :ne)
                      (otherwise :n)))
-                  (:right (update (tracker o) :right)
+                  (:right (update (key-tracker o) :right)
                    (keypress-case
                      (:up :ne)
                      (:down :se)
                      (otherwise :e)))
-                  (:left (update (tracker o) :left)
+                  (:left (update (key-tracker o) :left)
                    (keypress-case
                      (:up :nw)
                      (:down :sw)
                      (otherwise :w)))
                   (otherwise
-                    (let ((tracker (tracker o)))
+                    (let ((tracker (key-tracker o)))
                       (setf (keystate tracker :up) :up
                             (keystate tracker :down) :up
                             (keystate tracker :left) :up
