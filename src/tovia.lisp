@@ -424,9 +424,8 @@
     (asignf vertices left top left bottom right top right bottom))
   (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
 
-(defmethod fude-gl:draw ((o being))
-  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0)
-  (call-next-method))
+(defmethod fude-gl:draw :before ((o being))
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0))
 
 (defmethod fude-gl:draw :before ((o no-directional))
   (let ((step
