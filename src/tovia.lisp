@@ -652,8 +652,8 @@
         (vertices a)
       (multiple-value-bind (b-left b-right b-top b-bottom)
           (vertices b)
-        (and (or (< b-left a-left b-right) (< b-left a-right b-right))
-             (or (< b-top a-top b-bottom) (< b-top a-bottom b-bottom)))))))
+        (and (or (<= b-left a-left b-right) (<= b-left a-right b-right))
+             (or (<= b-top a-top b-bottom) (<= b-top a-bottom b-bottom)))))))
 
 (defun in-sight-p (a b distance)
   (let ((v
