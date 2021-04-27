@@ -35,6 +35,7 @@
            #:being ; class-name
            #:life ; reader
            #:coeff-of ; reader
+           #:find-coeff
            #:response?
            #:reserved-actions
            ;; Coeff protocols
@@ -339,6 +340,8 @@
 (defun coeff-of (name o) (append *coeffs* (gethash name (coeff o))))
 
 (defun (setf coeff-of) (new name o) (setf (gethash name (coeff o)) new))
+
+(defun find-coeff (name coeff) (assoc name coeff))
 
 (defun apply-coeff (init coeff)
   (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
