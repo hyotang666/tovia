@@ -8,7 +8,8 @@
            #:*width*
            #:*height*
            #:*pixel-size*
-           #:*colliders*)
+           #:*colliders*
+           #:*coeffs*)
   (:export ;;;; PARAMETER
            #:parameter ; type name, constructor
            #:make-parameter ; constructor
@@ -69,10 +70,12 @@
            #:react)
   (:export ;;;; helpers
            #:keypress-case
+           #:keypressp
            #:boxel
            #:front
            #:in-sight-p
-           #:target-direction)
+           #:target-direction
+           #:turn-direction)
   (:export #:main #:sequence-transition #:defsound #:play))
 
 (in-package :tovia)
