@@ -58,7 +58,7 @@
            #:projectile)
   (:export ;;;; STATUS-EFFECT
            #:status-effect ; class-name
-           )
+           #:guard-effect)
   (:export ;;;; COLLISION
            #:collidep
            #:add
@@ -397,6 +397,8 @@
 
 (defclass status-effect (mortal no-directional) ())
 
+(defclass guard-effect (mortal 8-directional) ())
+
 ;;;; DRAW
 
 (defun updatep (sprite) (not (zerop (funcall (timer sprite)))))
@@ -506,11 +508,17 @@
 
 (defmethod fude-gl:draw :after ((o being))
   (let ((effects (coeff-of :status-effect o)) (to-remove))
-    (dolist (e effects)
-      (if (<= 0 (decf (current (life e))))
-          (fude-gl:draw e)
-          (push e to-remove)))
-    (setf (coeff-of :status-effect o) (nset-difference effects to-remove))))
+    (loop :for (name . e) :in effects
+          :if (<= 0 (decf (current (life e))))
+            :do (setf (quaspar:x (quaspar:rect e)) (quaspar:x o)
+                      (quaspar:y (quaspar:rect e)) (quaspar:y o))
+                (fude-gl:draw e)
+          :else
+            :do (push name to-remove))
+    (setf (coeff-of :status-effect o)
+            (reduce #'delete-coeff to-remove
+                    :from-end t
+                    :initial-value (coeff-of :status-effect o)))))
 
 ;;;; MOVE
 
