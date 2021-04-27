@@ -709,19 +709,19 @@
                                     :se
                                     :e))))))))))
 
-(defgeneric react (subject object) (:method (s o))) ; Do nothing.
-
-(defmethod react ((subject phenomenon) (object being))
-  (when (and (not (eq (who subject) object)) (not (victimp object subject)))
+(defgeneric react (subject object)
+  (:method :around ((subject phenomenon) (object being))
+    (when (and (not (eq (who subject) object)) (not (victimp object subject)))
+      (call-next-method)))
+  (:method ((subject phenomenon) (object being))
     (add-victim object subject)
-    (dolist (effect (effects subject)) (funcall effect subject object))))
-
-(defmethod react ((object being) (subject phenomenon)) (react subject object))
-
-(defmethod react :after ((subject projectile) (object being))
-  (setf (current (life subject)) 0))
-
-(defmethod react ((object being) (subject projectile)) (react subject object))
+    (dolist (effect (effects subject)) (funcall effect subject object)))
+  (:method ((object being) (subject phenomenon)) (react subject object))
+  (:method ((object being) (subject projectile)) (react subject object))
+  (:method :after ((subject projectile) (object being))
+    (setf (current (life subject)) 0))
+  (:method (s o)) ; The default, do nothing.
+  )
 
 (declaim ;; Reaction protocols.
          ;; These functions must return function which is initializer.
