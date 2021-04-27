@@ -36,6 +36,7 @@
            #:life ; reader
            #:coeff-of ; reader
            #:response?
+           #:reserved-actions
            ;; Coeff protocols
            #:apply-coeff
            ;; Subclasses
@@ -52,6 +53,9 @@
            #:effect
            #:melee
            #:projectile)
+  (:export ;;;; STATUS-EFFECT
+           #:status-effect ; class-name
+           )
   (:export ;;;; COLLISION
            #:collidep
            #:add
@@ -308,11 +312,22 @@
                    :type direction
                    :accessor last-direction)))
 
-(defclass being ()
-  ((life :initform (parameter) :reader life :type parameter)
-   (coeff :reader coeff
+(defclass mortal () ((life :initarg :life :reader life :type parameter)))
+
+(defmethod initialize-instance :after ((o mortal) &key (life 100) current)
+  (setf (slot-value o 'life)
+          (if current
+              (parameter :current current :max life)
+              (make-parameter life))))
+
+(defclass being (mortal)
+  ((coeff :reader coeff
           :type hash-table
           :initform (make-hash-table :test #'eq))
+   (reserved-actions :initform nil
+                     :initarg :reserved-actions
+                     :accessor reserved-actions
+                     :type list)
    (response :initarg :response :reader response :type timer)))
 
 (defmethod initialize-instance :after
@@ -343,19 +358,17 @@
                 :type key-tracker
                 :reader key-tracker)))
 
-(defclass phenomenon ()
-  ((life :initarg :life :reader life :type parameter)
-   (victims :initform (make-hash-table) :type hash-table :reader victims)
+(defclass phenomenon (mortal)
+  ((victims :initform (make-hash-table) :type hash-table :reader victims)
    (effects :initarg :effects :reader effects :type list)
    (who :initarg :who :reader who :type being)))
 
 (defmethod initialize-instance :after
            ((o phenomenon)
-            &key effects (win (alexandria:required-argument :win)) (life 100))
+            &key effects (win (alexandria:required-argument :win)))
   (setf (slot-value o 'effects)
           (loop :for constructor :in effects
-                :collect (funcall constructor win))
-        (slot-value o 'life) (make-parameter life)))
+                :collect (funcall constructor win))))
 
 (defun add-victim (being phenomenon)
   (setf (gethash being (victims phenomenon)) t))
@@ -367,6 +380,8 @@
 (defclass melee (phenomenon 8-directional) ())
 
 (defclass projectile (phenomenon 8-directional) ())
+
+(defclass status-effect (mortal no-directional) ())
 
 ;;;; DRAW
 
@@ -459,6 +474,10 @@
   ;; Responds setting alpha blending.
   (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875))
 
+(defmethod fude-gl:draw :before ((o status-effect))
+  ;; Responds setting alpha blending.
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875))
+
 (defmethod fude-gl:draw ((o sprite))
   ;; Responds actual drawing.
   (fude-gl:with-uniforms (projection model (tex :unit 0))
@@ -470,6 +489,14 @@
                                     (+ half (quaspar:y o)) boxel boxel))
           tex (texture o))
     (fude-gl:draw 'sprite-quad)))
+
+(defmethod fude-gl:draw :after ((o being))
+  (let ((effects (coeff-of :status-effect o)) (to-remove))
+    (dolist (e effects)
+      (if (<= 0 (decf (current (life e))))
+          (fude-gl:draw e)
+          (push e to-remove)))
+    (setf (coeff-of :status-effect o) (nset-difference effects to-remove))))
 
 ;;;; MOVE
 
