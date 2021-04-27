@@ -379,6 +379,7 @@
                  :collect v)))
 
 (defmethod fude-gl:draw :before ((o 4-directional))
+  ;; Responds sprite animation.
   (let* ((unit (unit o))
          (step
           (if (updatep o)
@@ -401,6 +402,7 @@
   (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
 
 (defmethod fude-gl:draw :before ((o 8-directional))
+  ;; Responds sprite animation.
   (let* ((unit (unit o))
          (step
           (if (updatep o)
@@ -427,10 +429,8 @@
     (asignf vertices left top left bottom right top right bottom))
   (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data))
 
-(defmethod fude-gl:draw :before ((o being))
-  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0))
-
 (defmethod fude-gl:draw :before ((o no-directional))
+  ;; Responds sprite animation.
   (let ((step
          (if (updatep o)
              (funcall (stepper o))
@@ -451,11 +451,16 @@
             (asignf vertices left top left bottom right top right bottom))
           (fude-gl:send :buffer 'sprite-quad :method #'gl:buffer-sub-data)))))
 
-(defmethod fude-gl:draw ((o phenomenon))
-  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875)
-  (call-next-method))
+(defmethod fude-gl:draw :before ((o being))
+  ;; Responds setting alpha blending.
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 1.0))
+
+(defmethod fude-gl:draw :before ((o phenomenon))
+  ;; Responds setting alpha blending.
+  (setf (fude-gl:uniform (fude-gl:shader 'sprite-quad) "alpha") 0.875))
 
 (defmethod fude-gl:draw ((o sprite))
+  ;; Responds actual drawing.
   (fude-gl:with-uniforms (projection model (tex :unit 0))
       (fude-gl:shader 'sprite-quad)
     (setf projection (projection o)
