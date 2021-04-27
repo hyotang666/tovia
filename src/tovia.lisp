@@ -36,6 +36,7 @@
            #:life ; reader
            #:coeff-of ; reader
            #:find-coeff
+           #:append-coeff
            #:response?
            #:reserved-actions
            ;; Coeff protocols
@@ -340,6 +341,13 @@
 (defun coeff-of (name o) (append *coeffs* (gethash name (coeff o))))
 
 (defun (setf coeff-of) (new name o) (setf (gethash name (coeff o)) new))
+
+(defun append-coeff (coeff &rest args)
+  (labels ((rec (list acc)
+             (if (endp list)
+                 acc
+                 (rec (cddr list) (acons (car list) (cadr list) acc)))))
+    (rec args coeff)))
 
 (defun find-coeff (name coeff) (assoc name coeff))
 
