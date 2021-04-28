@@ -525,6 +525,16 @@
 
 ;;;; MOVE
 
+(define-compiler-macro keypressp (&whole whole keyword)
+  (if (constantp keyword)
+      `(sdl2:keyboard-state-p
+         ,(sdl2:scancode-key-to-value (keyword-scancode (eval keyword))))
+      whole))
+
+(defun keypressp (keyword)
+  (sdl2:keyboard-state-p
+    (sdl2:scancode-key-to-value (keyword-scancode keyword))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun <keypress-pred> (key)
     (etypecase key
