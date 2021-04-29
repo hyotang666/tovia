@@ -913,12 +913,19 @@
       (error "Unknown sound ~S: Eval (list-all-sounds)." name)))
 
 (defmacro defsound (name pathname)
-  `(setf (gethash ',name *sounds*) (truename ,pathname)))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (setf (gethash ',name *sounds*) (truename ,pathname))))
 
 (defmacro with-sounds ((var) &body body)
   `(symbol-macrolet ((,var org.shirakumo.fraf.harmony:*server*))
      (org.shirakumo.fraf.harmony:maybe-start-simple-server)
      (unwind-protect (progn ,@body) (org.shirakumo.fraf.harmony:stop ,var))))
+
+(define-compiler-macro play (&whole whole name &rest args)
+  (declare (ignore args))
+  (when (constantp name)
+    (sound (eval name)))
+  whole)
 
 (defun play (name &key repeat (mixer :effect))
   (org.shirakumo.fraf.harmony:play (sound name)
