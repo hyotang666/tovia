@@ -129,13 +129,21 @@
 
 ;;;; KEY-TRACKER
 
-(defstruct key-tracker
-  (state (make-array 256 :element-type 'bit) :type bit-vector)
-  (last-pressed-cursor nil :type (member nil :down :up :left :right))
-  (life (parameter) :type parameter :read-only t)
-  (last-pressed (alexandria:circular-list (list nil) (list nil) (list nil))
-                :type list)
-  (time (parameter :max 30 :current 0) :type parameter :read-only t))
+(defclass key-tracker ()
+  ((state :initform (make-array 256 :element-type 'bit)
+          :type bit-vector
+          :reader state)
+   (last-pressed-cursor :initform nil
+                        :type (member nil :down :up :left :right)
+                        :accessor last-pressed-cursor)
+   (life :initform (parameter) :type parameter :reader life)
+   (last-pressed :initform (alexandria:circular-list (list nil) (list nil)
+                                                     (list nil))
+                 :type list
+                 :accessor key-tracker-last-pressed)
+   (time :initform (parameter :max 30 :current 0)
+         :type parameter
+         :reader key-tracker-time)))
 
 (define-compiler-macro keyword-scancode (&whole whole keyword)
   (declare (notinline keyword-scancode))
@@ -146,9 +154,6 @@
 (defun keyword-scancode (keyword)
   (sdl2:scancode-key-to-value
     (intern (format nil "SCANCODE-~A" keyword) :keyword)))
-
-(defun (setf last-pressed-cursor) (new tracker)
-  (setf (key-tracker-last-pressed-cursor tracker) new))
 
 (defun last-pressed (tracker) (car (key-tracker-last-pressed tracker)))
 
@@ -161,21 +166,19 @@
 
 (defun keystate (tracker keyword)
   ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
-  (aref (key-tracker-state tracker) (keyword-scancode keyword)))
+  (aref (state tracker) (keyword-scancode keyword)))
 
 (defun (setf keystate) (new tracker keyword)
   (when (and (eq :down new)
              ;; To ignore cursor.
              (not (find keyword '(:down :up :left :right))))
     (setf (last-pressed tracker) keyword))
-  (setf (aref (key-tracker-state tracker) (keyword-scancode keyword))
+  (setf (aref (state tracker) (keyword-scancode keyword))
           (ecase new (:down 1) (:up 0))))
 
 (defun key-down-p (tracker keyword)
   ;; TODO: DEIFNE-COMPILER-MACRO for compile time KEYWORD-SCANCODE.
-  (= 1 (aref (key-tracker-state tracker) (keyword-scancode keyword))))
-
-(defun last-pressed-cursor (tracker) (key-tracker-last-pressed-cursor tracker))
+  (= 1 (aref (state tracker) (keyword-scancode keyword))))
 
 (defun command-input-p
        (command tracker delta &key (time (get-internal-real-time)))
@@ -396,7 +399,7 @@
 (defclass npc (4-directional being) ())
 
 (defclass player (4-directional being)
-  ((key-tracker :initform (make-key-tracker)
+  ((key-tracker :initform (make-instance 'key-tracker)
                 :type key-tracker
                 :reader key-tracker)))
 
@@ -648,7 +651,7 @@
            (if (not (eq cursor (last-pressed-cursor tracker)))
                ;; First time to press cursor.
                (setf (last-pressed-cursor tracker) cursor
-                     (current (key-tracker-life tracker)) 5
+                     (current (life tracker)) 5
                      (keystate tracker cursor) :down)
                (if (key-down-p tracker cursor)
                    ;; Keep on pressing.
@@ -687,10 +690,10 @@
                             (keystate tracker :down) :up
                             (keystate tracker :left) :up
                             (keystate tracker :right) :up
-                            (current (key-tracker-life tracker))
-                              (1- (current (key-tracker-life tracker)))
+                            (current (life tracker))
+                              (1- (current (life tracker)))
                             (last-pressed-cursor tracker)
-                              (if (<= (current (key-tracker-life tracker)) 0)
+                              (if (<= (current (life tracker)) 0)
                                   nil
                                   (last-pressed-cursor tracker))
                             (coeff-of :move o)
