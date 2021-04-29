@@ -40,7 +40,13 @@
            #:append-coeff
            #:delete-coeff
            #:response?
+           ;; REACTIONS
+           #:add-reaction
+           #:rem-reaction
+           ;; RESERVED-ACTIONS
            #:reserved-actions
+           #:reserve-actions
+           #:do-reserved-action
            ;; Coeff protocols
            #:apply-coeff
            ;; Subclasses
@@ -334,6 +340,7 @@
                      :initarg :reserved-actions
                      :accessor reserved-actions
                      :type list)
+   (reactions :initform (make-hash-table) :type hash-table :reader reactions)
    (response :initarg :response :reader response :type timer)))
 
 (defmethod initialize-instance :after
@@ -359,6 +366,21 @@
 
 (defun apply-coeff (init coeff)
   (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
+
+(defun reserve-actions (being &rest args)
+  ;; FIXME: QUEUE is better.
+  (alexandria:appendf (reserved-actions being) args))
+
+(defun do-reserved-action (being window)
+  (funcall (cdr (pop (reserved-actions being))) being window))
+
+(defun add-reaction (name reaction being)
+  (let ((exists? (gethash name (reactions being))))
+    (when exists?
+      (warn "Replace reaction ~S for ~S" name being))
+    (setf (gethash name (reactions being)) reaction)))
+
+(defun rem-reaction (name being) (remhash name (reactions being)))
 
 (defun response? (being) (< 0 (funcall (response being))))
 
@@ -787,6 +809,12 @@
   (:method ((object being) (subject projectile)) (react subject object))
   (:method :after ((subject projectile) (object being))
     (setf (current (life subject)) 0))
+  (:method ((a being) (b being))
+    (flet ((doit (a b)
+             (loop :for fun :being :each :hash-value :of (reactions a)
+                   :do (funcall fun a b))))
+      (doit a b)
+      (doit b a)))
   (:method (s o)) ; The default, do nothing.
   )
 
