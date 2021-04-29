@@ -535,18 +535,14 @@
     (fude-gl:draw 'sprite-quad)))
 
 (defmethod fude-gl:draw :after ((o being))
-  (let ((effects (coeff-of :status-effect o)) (to-remove))
-    (loop :for (name . e) :in effects
-          :if (<= 0 (decf (current (life e))))
-            :do (setf (quaspar:x (quaspar:rect e)) (quaspar:x o)
-                      (quaspar:y (quaspar:rect e)) (quaspar:y o))
-                (fude-gl:draw e)
-          :else
-            :do (push name to-remove))
+  (let ((effects (coeff-of :status-effect o)))
     (setf (coeff-of :status-effect o)
-            (reduce #'delete-coeff to-remove
-                    :from-end t
-                    :initial-value (coeff-of :status-effect o)))))
+            (loop :for e :in effects
+                  :if (<= 0 (decf (current (life (cdr e)))))
+                    :do (setf (quaspar:x (quaspar:rect (cdr e))) (quaspar:x o)
+                              (quaspar:y (quaspar:rect (cdr e))) (quaspar:y o))
+                        (fude-gl:draw (cdr e))
+                    :and :collect e))))
 
 ;;;; MOVE
 
