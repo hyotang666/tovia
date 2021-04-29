@@ -349,7 +349,7 @@
 
 (defparameter *coeffs* nil)
 
-(defun coeff-of (name o) (append *coeffs* (gethash name (coeff o))))
+(defun coeff-of (name o) (gethash name (coeff o)))
 
 (defun (setf coeff-of) (new name o) (setf (gethash name (coeff o)) new))
 
@@ -365,7 +365,10 @@
 (defun delete-coeff (name coeff) (delete name coeff :key #'car :count 1))
 
 (defun apply-coeff (init coeff)
-  (reduce #'funcall coeff :initial-value init :from-end t :key #'cdr))
+  (reduce #'funcall (append *coeffs* coeff)
+          :initial-value init
+          :key #'cdr
+          :from-end t))
 
 (defun reserve-actions (being &rest args)
   ;; FIXME: QUEUE is better.
