@@ -400,6 +400,7 @@
 
 (defclass player (4-directional being)
   ((key-tracker :initform (make-instance 'key-tracker)
+                :initarg :key-tracker
                 :type key-tracker
                 :reader key-tracker)))
 
