@@ -63,7 +63,8 @@
            ;; Subclasses
            #:effect
            #:melee
-           #:projectile)
+           #:projectile
+           #:radiation)
   (:export ;;;; STATUS-EFFECT
            #:status-effect ; class-name
            #:guard-effect)
@@ -429,6 +430,8 @@
 
 (defclass projectile (phenomenon 8-directional) ())
 
+(defclass radiation (phenomenon no-directional) ())
+
 (defclass status-effect (mortal no-directional) ())
 
 (defclass guard-effect (mortal 8-directional) ())
@@ -713,6 +716,9 @@
 (defmethod move ((o projectile) (win sdl2-ffi:sdl-window) &key)
   (call-next-method o win :direction (last-direction o)))
 
+(defmethod move ((o radiation) (win sdl2-ffi:sdl-window) &key)
+  (call-next-method o win :direction (last-direction o)))
+
 ;;;; COLLIDERS
 
 (defmacro with-colliders
@@ -817,7 +823,10 @@
     (dolist (effect (effects subject)) (funcall effect subject object)))
   (:method ((object being) (subject phenomenon)) (react subject object))
   (:method ((object being) (subject projectile)) (react subject object))
+  (:method ((object being) (subject radiation)) (react subject object))
   (:method :after ((subject projectile) (object being))
+    (setf (current (life subject)) 0))
+  (:method :after ((subject radiation) (object being))
     (setf (current (life subject)) 0))
   (:method ((a being) (b being))
     (flet ((doit (a b)
