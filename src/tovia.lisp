@@ -8,6 +8,7 @@
            #:*width*
            #:*height*
            #:*pixel-size*
+           #:*box-size*
            #:*colliders*
            #:*coeffs*)
   (:export ;;;; PARAMETER
