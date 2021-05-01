@@ -80,6 +80,7 @@
            #:boxel
            #:front
            #:in-sight-p
+           #:distance
            #:target-direction
            #:turn-direction)
   (:export #:main #:sequence-transition #:defsound #:play))
@@ -749,6 +750,11 @@
           (vertices b)
         (and (or (<= b-left a-left b-right) (<= b-left a-right b-right))
              (or (<= b-top a-top b-bottom) (<= b-top a-bottom b-bottom)))))))
+
+(defun distance (a b)
+  (sqrt
+    (+ (expt (- (quaspar:x a) (quaspar:x b)) 2)
+       (expt (- (quaspar:y a) (quaspar:y b)) 2))))
 
 (defun in-sight-p (a b distance)
   (let ((v
