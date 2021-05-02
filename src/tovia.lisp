@@ -85,7 +85,7 @@
            #:distance
            #:target-direction
            #:turn-direction)
-  (:export #:main #:sequence-transition #:defsound #:play))
+  (:export #:main #:sequence-transition #:defsound #:play #:pnd-random))
 
 (in-package :tovia)
 
@@ -980,6 +980,22 @@
                                    :mixer mixer
                                    :if-exists :restart
                                    :repeat repeat))
+
+(defun pnd-random (ceil)
+  "Pseud Normal Distribution."
+  (let #.(multiple-value-bind (list length)
+             (loop :for f :upfrom 0.0 :to (* 2 pi) :by 0.1
+                   :for v = (1- (/ (1+ (- (cos f))) 2))
+                   :collect v :into list
+                   :sum v :into sum
+                   :finally (return
+                             (values (mapcar (lambda (x) (/ x sum)) list)
+                                     (length list))))
+           `((list ',list) (length ,length)))
+    (loop :repeat (1+ (random length))
+          :for f :in list
+          :sum f :into acc
+          :finally (return (* acc ceil)))))
 
 ;;;; MAIN
 
