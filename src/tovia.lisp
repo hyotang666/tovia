@@ -65,6 +65,9 @@
            #:melee
            #:projectile
            #:radiation)
+  (:export ;;;; TRIGGER
+           #:trigger ; class name.
+           )
   (:export ;;;; STATUS-EFFECT
            #:status-effect ; class-name
            #:guard-effect)
@@ -435,6 +438,9 @@
 (defclass status-effect (mortal no-directional) ())
 
 (defclass guard-effect (mortal 8-directional) ())
+
+(defclass trigger (mortal no-directional)
+  ((effects :initarg :effects :reader effects :type list)))
 
 ;;;; DRAW
 
@@ -821,9 +827,12 @@
   (:method ((subject phenomenon) (object being))
     (add-victim object subject)
     (dolist (effect (effects subject)) (funcall effect subject object)))
+  (:method ((subject trigger) (object being))
+    (dolist (effect (effects subject)) (funcall effect subject object)))
   (:method ((object being) (subject phenomenon)) (react subject object))
   (:method ((object being) (subject projectile)) (react subject object))
   (:method ((object being) (subject radiation)) (react subject object))
+  (:method ((object being) (subject trigger)) (react subject object))
   (:method :after ((subject projectile) (object being))
     (setf (current (life subject)) 0))
   (:method :after ((subject radiation) (object being))
