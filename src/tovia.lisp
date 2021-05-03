@@ -89,6 +89,7 @@
            #:in-sight-beings
            #:nearest
            #:distance
+           #:forwardablep
            #:target-direction
            #:turn-direction)
   (:export #:main #:sequence-transition #:defsound #:play #:pnd-random))
@@ -592,6 +593,26 @@
                `(t ,@(cdr clause))
                `(,(<keypress-pred> (car clause)) ,@(cdr clause))))
          clause+)))
+
+(defun forwardablep (subject window direction)
+  (flet ((up? ()
+           (< (quaspar:y subject)
+              (- (nth-value 1 (sdl2:get-window-size window)) (boxel))))
+         (down? ()
+           (< 0 (quaspar:y subject)))
+         (right? ()
+           (< (quaspar:x subject) (- (sdl2:get-window-size window) (boxel))))
+         (left? ()
+           (< 0 (quaspar:x subject))))
+    (ecase direction
+      (:n (up?))
+      (:s (down?))
+      (:e (right?))
+      (:w (left?))
+      (:nw (or (up?) (left?)))
+      (:ne (or (up?) (right?)))
+      (:sw (or (down?) (left?)))
+      (:se (or (down?) (right?))))))
 
 (defgeneric move (subject window &key))
 
