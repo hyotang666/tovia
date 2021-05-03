@@ -86,7 +86,7 @@
            #:front
            #:do-beings
            #:in-sight-p
-           #:in-signt-beings
+           #:in-sight-beings
            #:distance
            #:target-direction
            #:turn-direction)
@@ -787,10 +787,11 @@
   ;; FIXME: cl-utilities:with-collecters is better.
   (uiop:while-collecting (collect)
     (do-beings (thing)
-      (multiple-value-bind (see? distance)
-          (in-sight-p subject thing distance)
-        (when see?
-          (collect (cons distance thing)))))))
+      (unless (eq subject thing)
+        (multiple-value-bind (see? distance)
+            (in-sight-p subject thing distance)
+          (when see?
+            (collect (cons distance thing))))))))
 
 (defun compass (lat1 lon1 lat2 lon2)
   (labels ((radian (degree)
