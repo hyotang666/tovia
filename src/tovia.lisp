@@ -85,6 +85,7 @@
            #:boxel
            #:front
            #:in-sight-p
+           #:in-signt-beings
            #:distance
            #:target-direction
            #:turn-direction)
@@ -775,6 +776,15 @@
            (+ (expt (- (quaspar:x a) (quaspar:x b)) 2)
               (expt (- (quaspar:y a) (quaspar:y b)) 2)))))
     (values (< v distance) v)))
+
+(defun in-sight-beings (subject distance &optional (*colliders* *colliders*))
+  (uiop:while-collecting (collect)
+    (quaspar:do-lqtree (thing *colliders*)
+      (unless (typep thing 'phenomenon)
+        (multiple-value-bind (see? distance)
+            (in-sight-p subject thing distance)
+          (when see?
+            (collect (cons distance thing))))))))
 
 (defun compass (lat1 lon1 lat2 lon2)
   (labels ((radian (degree)
