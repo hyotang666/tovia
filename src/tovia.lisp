@@ -91,7 +91,8 @@
            #:distance
            #:forwardablep
            #:target-direction
-           #:turn-direction)
+           #:turn-direction
+           #:walk-random)
   (:export #:main #:sequence-transition #:defsound #:play #:pnd-random))
 
 (in-package :tovia)
@@ -748,6 +749,14 @@
 
 (defmethod move ((o radiation) (win sdl2-ffi:sdl-window) &key)
   (call-next-method o win :direction (last-direction o)))
+
+(defun walk-random (s &optional (range *box-size*))
+  (apply #'reserve-actions s
+         (loop :with direction
+                     = (aref #(:s :n :w :e :nw :ne :sw :se) (random 8))
+               :repeat range
+               :collect (cons :move-box (lambda (s w)
+                                          (move s w :direction direction))))))
 
 ;;;; COLLIDERS
 
