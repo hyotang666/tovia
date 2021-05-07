@@ -47,6 +47,7 @@
            ;; RESERVED-ACTIONS
            #:reserved-actions
            #:reserve-actions
+           #:action-reserved-p
            #:do-reserved-action
            ;; Coeff protocols
            #:apply-coeff
@@ -354,12 +355,18 @@
                      :initarg :reserved-actions
                      :accessor reserved-actions
                      :type list)
-   (reactions :initform (make-hash-table) :type hash-table :reader reactions)
+   (reactions :initarg :reactions
+              :initform (make-hash-table)
+              :type hash-table
+              :reader reactions)
    (response :initarg :response :reader response :type timer)))
 
 (defmethod initialize-instance :after
-           ((o being) &key (response (n-bits-max 7)))
-  (setf (slot-value o 'response) (make-timer response)))
+           ((o being) &key (response (n-bits-max 7)) reactions)
+  (setf (slot-value o 'response) (make-timer response)
+        (slot-value o 'reactions) (make-hash-table :test #'eq))
+  (loop :for (k v) :on reactions :by #'cddr
+        :do (add-reaction k v o)))
 
 (defparameter *coeffs* nil)
 
@@ -387,6 +394,9 @@
 (defun reserve-actions (being &rest args)
   ;; FIXME: QUEUE is better.
   (alexandria:appendf (reserved-actions being) args))
+
+(defun action-reserved-p (name being)
+  (assoc name (reserved-actions being)))
 
 (defun do-reserved-action (being window)
   (funcall (cdr (pop (reserved-actions being))) being window))
