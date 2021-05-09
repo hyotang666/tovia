@@ -402,8 +402,7 @@
   ;; FIXME: QUEUE is better.
   (alexandria:appendf (reserved-actions being) args))
 
-(defun action-reserved-p (name being)
-  (assoc name (reserved-actions being)))
+(defun action-reserved-p (name being) (assoc name (reserved-actions being)))
 
 (defun do-reserved-action (being window)
   (funcall (cdr (pop (reserved-actions being))) being window))
@@ -842,13 +841,14 @@
             (collect (cons distance thing))))))))
 
 (defun nearest (list)
-  (destructuring-bind (distance . being)
-    (reduce
-      (lambda (champ challenger)
-        (if (< (car champ) (car challenger))
-            champ
-            challenger))
-      list)
+  (destructuring-bind
+      (distance . being)
+      (reduce
+        (lambda (champ challenger)
+          (if (< (car champ) (car challenger))
+              champ
+              challenger))
+        list)
     (values being distance)))
 
 (defun compass (lat1 lon1 lat2 lon2)
