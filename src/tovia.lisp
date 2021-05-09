@@ -835,13 +835,14 @@
             (collect (cons distance thing))))))))
 
 (defun nearest (list)
-  (cdr
+  (destructuring-bind (distance . being)
     (reduce
       (lambda (champ challenger)
         (if (< (car champ) (car challenger))
             champ
             challenger))
-      list)))
+      list)
+    (values being distance)))
 
 (defun compass (lat1 lon1 lat2 lon2)
   (labels ((radian (degree)
