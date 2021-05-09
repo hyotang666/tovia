@@ -59,6 +59,11 @@
            ;; Subclasses
            #:npc
            #:player)
+  (:export ;;;; HAVING
+           #:having ; class-name
+           #:inventory ; reader
+           #:add-item ; helpers.
+           #:consume)
   (:export ;;;; PHENOMENON
            #:phenomenon ; class name
            #:who ; reader
@@ -80,6 +85,7 @@
   (:export ;;;; COLLISION
            #:collidep
            #:add
+           #:del
            #:delete-lives
            #:deadp)
   (:export ;;;; GENERIC-FUNCTIONS
@@ -309,6 +315,17 @@
   :shader 'sprite-shader)
 
 ;; CLASSES
+
+(defclass having () ((inventory :accessor inventory :initform nil)))
+
+(defun add-item (item having &optional (num 1))
+  (incf (getf (inventory having) item 0) num)
+  item)
+
+(defun consume (item having)
+  (if (= 0 (decf (getf (inventory having) item) 1))
+      (remf (inventory having) item))
+  item)
 
 (deftype direction () '(member :n :s :e :w :nw :ne :sw :se))
 
