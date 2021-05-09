@@ -16,6 +16,11 @@
            #:make-parameter ; constructor
            #:current ; accessor
            #:max-of ; accessor
+           #:parameter-ratio ; helper
+           )
+  (:export ;;;; TIMER
+           #:timer ; type name
+           #:make-timer ; constructor
            )
   (:export ;;;; KEY-TRACKER
            #:key-tracker ; type-name, reader
@@ -138,6 +143,8 @@
 
 (defun (setf max-of) (new parameter)
   (setf (parameter-max parameter) (min (parameter-system-max parameter) new)))
+
+(defun parameter-ratio (parameter) (/ (current parameter) (max-of parameter)))
 
 ;;;; KEY-TRACKER
 
