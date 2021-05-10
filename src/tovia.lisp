@@ -64,6 +64,7 @@
            #:having ; class-name
            #:inventory ; reader
            #:add-item ; helpers.
+           #:count-item
            #:consume)
   (:export ;;;; PHENOMENON
            #:phenomenon ; class name
@@ -322,6 +323,8 @@
 (defun add-item (item having &optional (num 1))
   (incf (getf (inventory having) item 0) num)
   item)
+
+(defun count-item (item having) (getf (inventory having) item 0))
 
 (defun consume (item having)
   (if (= 0 (decf (getf (inventory having) item) 1))
