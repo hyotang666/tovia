@@ -327,9 +327,10 @@
 (defun count-item (item having) (getf (inventory having) item 0))
 
 (defun consume (item having)
-  (if (= 0 (decf (getf (inventory having) item) 1))
-      (remf (inventory having) item))
-  item)
+  (case (decf (getf (inventory having) item 0))
+    (-1 (remf (inventory having) item) nil)
+    (0 (remf (inventory having) item) t)
+    (otherwise t)))
 
 (deftype direction () '(member :n :s :e :w :nw :ne :sw :se))
 
