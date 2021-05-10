@@ -37,6 +37,7 @@
            #:x
            #:y)
   (:export ;;;; DIRECTIONAL
+           #:no-directional
            #:last-direction)
   (:export ;;;; BEING
            #:being ; class-name
